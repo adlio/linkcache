@@ -2,6 +2,8 @@
 name = "linkcache"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "Link search utility"
 
 [dependencies]
 dirs = "5.0.1"
