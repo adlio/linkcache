@@ -17,6 +17,7 @@ tantivy = "0.22"
 filetime = "0.2.23"
 sublime_fuzzy = "0.7.0"
 itertools = "0.13.0"
+chrono = { version = "0.4", features = ["serde"] }
 
 
 [dev-dependencies]
