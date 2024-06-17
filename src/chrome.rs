@@ -102,8 +102,7 @@ impl Browser {
                 let mut stmt = conn.prepare(
                     r#"
                     SELECT id, url, title,
-                    last_visit_time,
-                    visit_count, typed_count
+                    CAST((last_visit_time / 1000000) - 11644473600 AS INTEGER) AS last_visit_time_epoch
                     FROM urls
                     WHERE title LIKE ?1 OR url LIKE ?1
                     ORDER BY
@@ -111,7 +110,7 @@ impl Browser {
                     last_visit_time DESC,
                     visit_count DESC,
                     typed_count DESC
-                    LIMIT 20
+                    LIMIT 50
                     "#,
                 )?;
                 let links = stmt
@@ -120,12 +119,8 @@ impl Browser {
                             id: row.get(0)?,
                             url: row.get(1)?,
                             title: row.get(2)?,
-                            visit_count: row.get(4)?,
-                            typed_count: row.get(5)?,
-                            short_title: None,
-                            long_title: None,
-                            subtitle: None,
-                            score: Some(0 as f32),
+                            timestamp: row.get(3)?,
+                            ..Default::default()
                         })
                     })?
                     .filter_map(|link| link.ok())
@@ -149,10 +144,23 @@ impl Browser {
         fn traverse(node: &Value, links: &mut Vec<Link>, subtitle: &str) {
             if let Some(my_title) = node.get("name").and_then(Value::as_str) {
                 if let Some(url) = node.get("url").and_then(Value::as_str) {
+                    let date_added = match node.get("date_added").and_then(Value::as_str) {
+                        Some(date_str) => {
+                            let mut date = date_str.parse().unwrap_or_default();
+                            if date > 0 {
+                                // Convert from Chrome timestamp to Unix epoch
+                                date = (date / 1000000) - 11644473600
+                            }
+                            date
+                        }
+                        None => 0,
+                    };
+
                     links.push(Link {
                         title: my_title.to_string(),
                         url: url.to_string(),
                         subtitle: Some(subtitle.to_string()),
+                        timestamp: date_added,
                         ..Default::default()
                     });
                 }
@@ -192,9 +200,10 @@ impl Browser {
                 let mut stmt = conn.prepare(
                     r#"
                         SELECT id, url, title,
-                        last_visit_time,
-                        visit_count, typed_count
+                        CAST((last_visit_time / 1000000) - 11644473600 AS INTEGER) AS last_visit_time_epoch
                         FROM urls
+                        WHERE typed_count > 0
+                        AND last_visit_time > 0
                         ORDER BY last_visit_time ASC
                     "#,
                 )?;
@@ -205,8 +214,7 @@ impl Browser {
                             id: row.get(0)?,
                             url: row.get(1)?,
                             title: row.get(2)?,
-                            visit_count: row.get(4)?,
-                            typed_count: row.get(5)?,
+                            timestamp: row.get(3)?,
                             ..Default::default()
                         })
                     })?

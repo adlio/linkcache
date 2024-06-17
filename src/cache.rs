@@ -1,7 +1,8 @@
 use std::{fs, path::PathBuf};
 
 use serde_json::{from_str, to_string};
-use tantivy::query::QueryParser;
+use tantivy::collector::TopDocs;
+use tantivy::query::{AllQuery, QueryParser};
 use tantivy::schema::*;
 use tantivy::tokenizer::*;
 use tantivy::{doc, Index, IndexWriter};
@@ -51,8 +52,17 @@ impl CacheBuilder {
                     .set_index_option(IndexRecordOption::WithFreqsAndPositions),
             ),
         );
+        builder.add_text_field(
+            "author",
+            TextOptions::default().set_indexing_options(
+                TextFieldIndexing::default()
+                    .set_tokenizer("ngram")
+                    .set_index_option(IndexRecordOption::WithFreqsAndPositions),
+            ),
+        );
         builder.add_text_field("subtitle", TEXT);
         builder.add_text_field("url", STRING);
+        builder.add_date_field("timestamp", STORED | FAST);
         builder.add_text_field("struct_json", STORED);
         let schema = builder.build();
 
@@ -99,6 +109,8 @@ impl Cache {
             self.index.schema().get_field("title")? => link.title,
             self.index.schema().get_field("subtitle")? => link.subtitle.unwrap_or_default(),
             self.index.schema().get_field("url")? => link.url,
+            self.index.schema().get_field("author")? => link.author.unwrap_or_default(),
+            self.index.schema().get_field("timestamp")? => link.timestamp,
             self.index.schema().get_field("struct_json")? => json_str,
         ))?;
         Ok(())
@@ -123,6 +135,10 @@ impl Cache {
 
     /// Searches the index for linkx matching the query
     pub fn search(&self, query: &str) -> Result<Vec<Link>> {
+        if query.is_empty() {
+            return self.get_latest_n(50);
+        }
+
         let reader = self.index.reader()?;
         let searcher = reader.searcher();
 
@@ -133,21 +149,36 @@ impl Cache {
         parser.set_field_boost(title_field, 2.0);
         let query = parser.parse_query_lenient(query).0;
 
-        let top_docs = searcher.search(&query, &tantivy::collector::TopDocs::with_limit(20))?;
+        let top_docs = searcher.search(&query, &TopDocs::with_limit(20))?;
 
         let results = top_docs
             .into_iter()
             .map(|(score, doc_address)| {
                 let doc: TantivyDocument = searcher.doc(doc_address).unwrap();
-                let json_string = doc
-                    .get_first(self.index.schema().get_field("struct_json").unwrap())
-                    .and_then(|v| v.as_str())
-                    .unwrap()
-                    .to_owned();
-                let mut link: Link = from_str(json_string.as_str()).unwrap();
+                let mut link = self.doc_to_link(&doc);
                 link.score = Some(score);
                 link
             })
+            .collect();
+        Ok(results)
+    }
+
+    pub fn get_latest_n(&self, n: usize) -> Result<Vec<Link>> {
+        let reader = self.index.reader()?;
+        let searcher = reader.searcher();
+
+        let top_docs = searcher.search(
+            &AllQuery,
+            &TopDocs::with_limit(n).order_by_fast_field("timestamp", tantivy::Order::Desc),
+        )?;
+        let results = top_docs
+            .into_iter()
+            .map(
+                |(_timestamp, doc_address): (tantivy::DateTime, tantivy::DocAddress)| {
+                    let doc: TantivyDocument = searcher.doc(doc_address).unwrap();
+                    self.doc_to_link(&doc)
+                },
+            )
             .collect();
         Ok(results)
     }
@@ -159,6 +190,24 @@ impl Cache {
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join(".linkcache")
+    }
+
+    /// Converts a Tantivy document into a Link struct by parsing the
+    /// struct_json field.
+    ///
+    fn doc_to_link(&self, doc: &TantivyDocument) -> Link {
+        let json_string = doc
+            .get_first(self.index.schema().get_field("struct_json").unwrap())
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_owned();
+        let mut link: Link = from_str(json_string.as_str()).unwrap();
+        let date = chrono::DateTime::from_timestamp(link.timestamp, 0)
+            .unwrap()
+            .format("%Y-%m-%d %I:%M:%S %p")
+            .to_string();
+        link.subtitle = Some(date);
+        link
     }
 }
 
