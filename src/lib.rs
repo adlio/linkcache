@@ -1,10 +1,10 @@
 mod cache;
+mod ddl;
 mod error;
 mod link;
 
 pub use cache::Cache;
-pub use cache::CacheBuilder;
-pub use error::Error;
+pub use error::{Error, Result};
 pub use link::Link;
 
 pub mod chrome;
