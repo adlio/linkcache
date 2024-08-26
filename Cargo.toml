@@ -5,20 +5,33 @@ edition = "2021"
 license = "MIT"
 description = "Link search utility"
 
-[dependencies]
-dirs = "5.0.1"
-rusqlite = { version = "0.31.0", features = ["bundled"] }
-image = "0.25"
-log = "0.4.20"
-regex = "1.10"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tantivy = "0.22"
-filetime = "0.2.23"
-sublime_fuzzy = "0.7.0"
-itertools = "0.13.0"
-chrono = { version = "0.4", features = ["serde"] }
+[features]
+default = ["lib"]
+lib = []
+bin = []
 
+
+[[bin]]
+name = "linkcache"
+path = "src/bin/linkcache.rs"
+required-features = ["bin"]
+
+[dependencies]
+dirs = "5"
+rusqlite = { version = "0", features = ["bundled", "chrono"] }
+image = "0"
+log = "0"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+filetime = "0"
+sublime_fuzzy = "0"
+itertools = "0"
+chrono = { version = "0", features = ["serde"] }
+
+# Binary-only dependencies
+alfrusco = { version = "0", path = "../alfrusco" }
+clap = "4.5"
 
 [dev-dependencies]
 tempfile = "3.10.1"
