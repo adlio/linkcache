@@ -1,6 +1,4 @@
-use crate::error::Result;
-use crate::{Cache, Link};
-
+use chrono::DateTime;
 use filetime::FileTime;
 use itertools::Itertools;
 use rusqlite::{params, Connection};
@@ -10,6 +8,9 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 use sublime_fuzzy::best_match;
+
+use crate::error::Result;
+use crate::{Cache, Link};
 
 pub struct Browser {
     profile_dir: PathBuf,
@@ -38,7 +39,6 @@ impl Browser {
         for link in links {
             cache.add(link)?;
         }
-        cache.commit()?;
         Ok(())
     }
 
@@ -50,7 +50,6 @@ impl Browser {
         for link in links {
             cache.add(link)?;
         }
-        cache.commit()?;
         Ok(())
     }
 
@@ -101,8 +100,8 @@ impl Browser {
             Ok(conn) => {
                 let mut stmt = conn.prepare(
                     r#"
-                    SELECT id, url, title,
-                    CAST((last_visit_time / 1000000) - 11644473600 AS INTEGER) AS last_visit_time_epoch
+                    SELECT url, title,
+                    CAST((last_visit_time / 1000000) - 11644473600 AS INTEGER) || 'Z' AS last_visit_time_epoch
                     FROM urls
                     WHERE title LIKE ?1 OR url LIKE ?1
                     ORDER BY
@@ -116,7 +115,7 @@ impl Browser {
                 let links = stmt
                     .query_map(params![format!("%{}%", query)], |row| {
                         Ok(Link {
-                            id: row.get(0)?,
+                            // id: row.get(0)?,
                             url: row.get(1)?,
                             title: row.get(2)?,
                             timestamp: row.get(3)?,
@@ -160,7 +159,8 @@ impl Browser {
                         title: my_title.to_string(),
                         url: url.to_string(),
                         subtitle: Some(subtitle.to_string()),
-                        timestamp: date_added,
+                        timestamp: DateTime::from_timestamp(date_added, 0)
+                            .expect("Failed to convert timestamp"),
                         ..Default::default()
                     });
                 }
@@ -211,7 +211,6 @@ impl Browser {
                     // Map the query to a result per row
                     .query_map(params![], |row| {
                         Ok(Link {
-                            id: row.get(0)?,
                             url: row.get(1)?,
                             title: row.get(2)?,
                             timestamp: row.get(3)?,
