@@ -19,7 +19,7 @@ fn main() {
 fn run(wf: &mut Workflow) -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    let cache = Cache::default()?;
+    let _cache = Cache::default()?;
     let arc = arc::Browser::new();
     let links = arc.sidebar_links()?;
     let items: Vec<Item> = links
