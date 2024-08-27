@@ -53,15 +53,11 @@ impl<'de> Deserialize<'de> for SidebarItemType {
     {
         let value = Value::deserialize(deserializer)?;
         if value.get("data").and_then(|d| d.get("list")).is_some() {
-            println!("Found a data.list");
-            println!("{:?}", value.get("data").and_then(|d| d.get("list")));
             if let Ok(folder) = serde_json::from_value::<SidebarFolder>(value.clone()) {
                 return Ok(SidebarItemType::Folder(folder));
             }
         }
         if value.get("data").and_then(|d| d.get("tab")).is_some() {
-            println!("Found a data.tab");
-            println!("{:?}", value.get("data").and_then(|d| d.get("tab")));
             if let Ok(bookmark) = serde_json::from_value::<SidebarBookmark>(value.clone()) {
                 return Ok(SidebarItemType::Bookmark(bookmark));
             }
@@ -94,8 +90,6 @@ impl Browser {
             if let Some(containers) = sidebar.get("containers").and_then(Value::as_array) {
                 for container in containers {
                     if let Some(spaces) = container.get("spaces").and_then(Value::as_array) {
-                        println!("Found {} spaces", spaces.len());
-
                         // Store a lookup of each Space
                         for space in spaces {
                             if let Some(space_id) = space.get("id").and_then(Value::as_str) {
@@ -116,7 +110,6 @@ impl Browser {
                                             SidebarItemType::Bookmark(bookmark) => {
                                                 if let Some(title) = bookmark.title {
                                                     if let Some(url) = bookmark.data.tab.saved_url {
-                                                        println!("Both on this bookmark");
                                                         links.push(Link {
                                                             title,
                                                             url,
@@ -125,9 +118,7 @@ impl Browser {
                                                     }
                                                 }
                                             }
-                                            SidebarItemType::Folder(folder) => {
-                                                println!("Folder: {:?}", folder.title);
-                                            }
+                                            SidebarItemType::Folder(folder) => { /* No Op */ }
                                             SidebarItemType::Value(_id) => {
                                                 // No-Op
                                             }
@@ -135,7 +126,8 @@ impl Browser {
                                     }
                                 }
                                 Err(e) => {
-                                    println!("Error: {}", e);
+                                    // No op
+                                    // println!("Error: {}", e);
                                 }
                             }
                         }
