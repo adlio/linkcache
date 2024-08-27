@@ -118,14 +118,14 @@ impl Browser {
                                                     }
                                                 }
                                             }
-                                            SidebarItemType::Folder(folder) => { /* No Op */ }
+                                            SidebarItemType::Folder(_folder) => { /* No Op */ }
                                             SidebarItemType::Value(_id) => {
                                                 // No-Op
                                             }
                                         }
                                     }
                                 }
-                                Err(e) => {
+                                Err(_err) => {
                                     // No op
                                     // println!("Error: {}", e);
                                 }
@@ -156,6 +156,12 @@ impl Browser {
             _ => home_dir.join(".config/arc"),
         };
         arc_data_dir
+    }
+}
+
+impl Default for Browser {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
