@@ -30,14 +30,8 @@ pub struct Sidebar {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SidebarContainer {
-    Global(SidebarGlobalContainer),
     SpacesAndItems(SidebarSpacesAndItemsContainer),
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SidebarGlobalContainer {
-    #[serde(rename = "global")]
-    pub global: Value,
+    Value(serde_json::Value),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
