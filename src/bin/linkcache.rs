@@ -24,7 +24,11 @@ fn run(wf: &mut Workflow) -> Result<(), Box<dyn std::error::Error>> {
     let links = arc.sidebar_links()?;
     let items: Vec<Item> = links
         .into_iter()
-        .map(|link| URLItem::new(link.title, link.url).into())
+        .map(|link| {
+            let mut item: Item = URLItem::new(link.title, link.url).into();
+            item = item.subtitle(link.subtitle.unwrap_or_default());
+            item
+        })
         .collect();
     wf.response.append_items(items);
 
