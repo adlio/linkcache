@@ -25,8 +25,10 @@ fn run(wf: &mut Workflow) -> Result<(), Box<dyn std::error::Error>> {
     let items: Vec<Item> = links
         .into_iter()
         .map(|link| {
-            let mut item: Item = URLItem::new(link.title, link.url).into();
-            item = item.subtitle(link.subtitle.unwrap_or_default());
+            let mut item: Item = URLItem::new(&link.title, &link.url).into();
+            let subtitle = link.subtitle.unwrap_or_default();
+            item = item.subtitle(&subtitle);
+            item = item.matches(format!("{} / {}", subtitle, &link.title));
             item
         })
         .collect();
