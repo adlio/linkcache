@@ -12,7 +12,7 @@ struct Args {
 }
 
 fn main() {
-    let config = WorkflowConfig::for_testing().expect("Failed to create alfrusco config");
+    let config = WorkflowConfig::from_env().expect("Could not parse workflow config");
     Workflow::run(config, run);
 }
 
