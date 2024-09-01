@@ -1,24 +1,29 @@
-use crate::error::Result;
-use crate::Link;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::BufReader;
-use std::num::ParseIntError;
-use std::path::PathBuf;
 
-pub struct Browser {
-    profile_dir: PathBuf,
+use crate::error::Result;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Node {
+    Space(Space),
+    Folder(Folder),
+    Bookmark(Bookmark),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SidebarState {
+pub(crate) struct SidebarState {
     pub sidebar_sync_state: Value,
     pub version: i64,
     pub sidebar: Sidebar,
     pub firebase_sync_state: Value,
+
+    #[serde(default)]
+    pub item_map: HashMap<String, Node>,
+
+    space_title_map: Option<HashMap<String, String>>,
+    folder_title_map: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -47,13 +52,13 @@ pub struct SidebarSpacesAndItemsContainer {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SpaceType {
-    Space(SidebarSpace),
+    Space(Space),
     Value(serde_json::Value),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SidebarSpace {
+pub struct Space {
     pub id: String,
     pub title: Option<String>,
     pub custom_info: Value,
@@ -67,13 +72,13 @@ pub struct SidebarSpace {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum SidebarItemType {
-    Folder(SidebarFolder),
-    Bookmark(SidebarBookmark),
+    Folder(Folder),
+    Bookmark(Bookmark),
     Value(serde_json::Value),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SidebarBookmark {
+pub struct Bookmark {
     pub id: String,
     pub title: Option<String>,
     pub data: SidebarTabData,
@@ -82,12 +87,37 @@ pub struct SidebarBookmark {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SidebarFolder {
+pub struct Folder {
     pub id: String,
     pub title: Option<String>,
     pub data: serde_json::Value,
     #[serde(rename = "parentID")]
     pub parent_id: Option<String>,
+    #[serde(rename = "childrenIds")]
+    pub children_ids: Vec<String>,
+    #[serde(rename = "isUnread")]
+    pub is_unread: Option<bool>,
+    #[serde(rename = "originatingDevice")]
+    pub originating_device: Option<String>,
+    #[serde(rename = "createdAt")]
+    pub created_at: Option<f64>,
+}
+
+impl Folder {
+    pub fn parent_id(&self) -> Option<String> {
+        if let Some(parent_id) = &self.parent_id {
+            Some(parent_id.clone())
+        } else {
+            if let Some(parent_id) = self
+                .data
+                .pointer("/itemContainer/containerType/spaceItems/_0")
+            {
+                Some(parent_id.as_str().unwrap().to_string())
+            } else {
+                None
+            }
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -103,128 +133,70 @@ pub struct Tab {
     pub saved_url: Option<String>,
 }
 
-impl Browser {
-    /// Default constructor which creates a new Arc Browser with the default path
-    /// to the Arc profile directory.
-    pub fn new() -> Self {
-        Browser {
-            profile_dir: Self::default_profile_dir(),
-        }
-    }
-
-    /// Alternate constructor that allows the user to specify a custom path to
-    /// the directory where the Arc profile (including the StorableSidebar.json
-    /// file) is stored.
-    pub fn with_profile_dir(mut self, dir: PathBuf) -> Self {
-        self.profile_dir = dir;
-        self
-    }
-
-    pub fn sidebar_links(&self) -> Result<Vec<Link>> {
-        // Data values
-        let state = self.sidebar_json()?;
-        let folder_titles = state.folder_title_map();
-        // let space_titles = state.space_title_map();
-        let bookmarks = state.bookmarks();
-
-        let mut links: Vec<Link> = vec![];
-
-        for bookmark in bookmarks {
-            let title = bookmark.title().unwrap_or_default();
-            let url = bookmark.data.tab.saved_url.unwrap_or_default();
-            let mut subtitle = String::new();
-            let mut link = Link::new(url, title);
-            if let Some(parent_id) = bookmark.parent_id {
-                if let Some(folder_title) = folder_titles.get(&parent_id) {
-                    subtitle = folder_title.clone();
-                }
-                link = link.with_subtitle(subtitle);
-            }
-            links.push(link);
-        }
-
-        Ok(links)
-    }
-
-    fn sidebar_json(&self) -> Result<SidebarState> {
-        let file = File::open(self.sidebar_path())?;
-        let reader = BufReader::new(file);
-        let state = serde_json::from_value::<SidebarState>(serde_json::from_reader(reader)?)?;
-        Ok(state)
-    }
-
-    /// Returns the path on disk where the StorableSidebar.json file is stored.
-    /// This file stores the state of the entire pinned site/bookmark sidebar
-    /// in the Arc browser.
-    ///
-    fn sidebar_path(&self) -> PathBuf {
-        self.profile_dir.join("StorableSidebar.json")
-    }
-
-    /// Returns the directory of the Default Arc profile directory based on the
-    /// user's operating system and detected home directory.
-    pub fn default_profile_dir() -> PathBuf {
-        let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
-        let arc_data_dir = match std::env::consts::OS {
-            "macos" => home_dir.join("Library/Application Support/Arc"),
-            // TODO linux is untested
-            "linux" => home_dir.join(".config/arc"),
-            // TODO windows is untested
-            "windows" => home_dir.join("AppData/Local/Arc"),
-            _ => home_dir.join(".config/arc"),
-        };
-        arc_data_dir
-    }
-}
-
-impl Default for Browser {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl SidebarState {
-    /// Returns a map to lookup the names of each space in the entire SidebarState
-    /// by their IDs.
-    ///
-    pub fn space_title_map(&self) -> HashMap<String, String> {
-        let mut space_titles: HashMap<String, String> = HashMap::new();
+    pub fn ancestor_titles(&mut self, id: &str) -> Result<String> {
+        self.build_item_map()?;
+
+        let mut titles: Vec<String> = vec![];
+        let mut current_id = id.to_string();
+        while let Some(node) = self.item_map.get(current_id.as_str()) {
+            match node {
+                Node::Folder(folder) => {
+                    let title = folder.title.clone().unwrap_or_default();
+                    if !title.is_empty() {
+                        titles.insert(0, title);
+                    }
+                    match folder.parent_id().clone() {
+                        Some(pid) => {
+                            current_id = pid.clone();
+                        }
+                        None => {
+                            break;
+                        }
+                    }
+                }
+                Node::Space(space) => {
+                    let title = space.title.clone().unwrap_or_default();
+                    if !title.is_empty() {
+                        titles.insert(0, title);
+                    }
+                    break;
+                }
+                Node::Bookmark(bookmark) => {
+                    current_id = bookmark.parent_id.clone().unwrap_or_default();
+                }
+            }
+        }
+        Ok(titles.join(" / "))
+    }
+
+    pub fn build_item_map(&mut self) -> Result<()> {
+        if !self.item_map.is_empty() {
+            return Ok(());
+        }
         for container in &self.sidebar.containers {
             match container {
                 SidebarContainer::SpacesAndItems(spaces_and_items) => {
                     for space in &spaces_and_items.spaces {
                         match space {
                             SpaceType::Space(sidebar_space) => {
-                                space_titles.insert(
+                                self.item_map.insert(
                                     sidebar_space.id.clone(),
-                                    sidebar_space.title.clone().unwrap_or_default(),
+                                    Node::Space(sidebar_space.clone()),
                                 );
                             }
                             SpaceType::Value(_) => {}
                         }
                     }
-                }
-                _ => {}
-            }
-        }
-        space_titles
-    }
-
-    /// Returns a map to lookup the names of each folder in the entire
-    /// SidebarState by their IDs.
-    ///
-    pub fn folder_title_map(&self) -> HashMap<String, String> {
-        let mut folder_titles: HashMap<String, String> = HashMap::new();
-        for container in &self.sidebar.containers {
-            match container {
-                SidebarContainer::SpacesAndItems(spaces_and_items) => {
                     for item in &spaces_and_items.items {
                         match item {
                             SidebarItemType::Folder(folder) => {
-                                folder_titles.insert(
-                                    folder.id.clone(),
-                                    folder.title.clone().unwrap_or_default(),
-                                );
+                                self.item_map
+                                    .insert(folder.id.clone(), Node::Folder(folder.clone()));
+                            }
+                            SidebarItemType::Bookmark(bookmark) => {
+                                self.item_map
+                                    .insert(bookmark.id.clone(), Node::Bookmark(bookmark.clone()));
                             }
                             _ => {}
                         }
@@ -233,12 +205,13 @@ impl SidebarState {
                 _ => {}
             }
         }
-        folder_titles
+        Ok(())
     }
 
     /// Returns a list of all bookmarks in the entire SidebarState
-    pub fn bookmarks(&self) -> Vec<SidebarBookmark> {
-        let mut bookmarks: Vec<SidebarBookmark> = vec![];
+    pub fn bookmarks(&self) -> Vec<Bookmark> {
+        let mut bookmarks: Vec<Bookmark> = vec![];
+
         for container in &self.sidebar.containers {
             match container {
                 SidebarContainer::SpacesAndItems(spaces_and_items) => {
@@ -258,7 +231,7 @@ impl SidebarState {
     }
 }
 
-impl SidebarBookmark {
+impl Bookmark {
     /// Returns the title of the bookmark, preferring the human-set title
     /// and falling back to the title saved from the page. Will return an
     /// empty
@@ -290,13 +263,13 @@ impl<'de> Deserialize<'de> for SidebarItemType {
         D: Deserializer<'de>,
     {
         let value = Value::deserialize(deserializer)?;
-        if value.get("data").and_then(|d| d.get("list")).is_some() {
-            if let Ok(folder) = serde_json::from_value::<SidebarFolder>(value.clone()) {
+        if value.pointer("/data/list").is_some() || value.pointer("/data/itemContainer").is_some() {
+            if let Ok(folder) = serde_json::from_value::<Folder>(value.clone()) {
                 return Ok(SidebarItemType::Folder(folder));
             }
         }
-        if value.get("data").and_then(|d| d.get("tab")).is_some() {
-            if let Ok(bookmark) = serde_json::from_value::<SidebarBookmark>(value.clone()) {
+        if value.pointer("/data/tab").is_some() {
+            if let Ok(bookmark) = serde_json::from_value::<Bookmark>(value.clone()) {
                 return Ok(SidebarItemType::Bookmark(bookmark));
             }
         }
@@ -309,40 +282,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_space_title_map() -> Result<()> {
-        let browser = Browser::new().with_profile_dir(PathBuf::from("./test_data"));
-        let state = browser.sidebar_json()?;
-        let space_titles = state.space_title_map();
-        for (id, title) in space_titles {
-            println!("{}: {}", id, title);
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn test_folder_title_map() -> Result<()> {
-        let browser = Browser::new().with_profile_dir(PathBuf::from("./test_data"));
-        let state = browser.sidebar_json()?;
-        let space_titles = state.folder_title_map();
-        for (id, title) in space_titles {
-            println!("{}: {}", id, title);
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn test_storable_sidebar() -> Result<()> {
-        let browser = Browser::new().with_profile_dir(PathBuf::from("./test_data"));
-        let links = browser.sidebar_links()?;
-        for link in links {
-            println!("{}: {}", link.title, link.url);
-        }
-        Ok(())
-    }
-
-    #[test]
     fn test_bookmark_title_fallback() {
-        let bookmark = SidebarBookmark {
+        let bookmark = Bookmark {
             id: "123".to_string(),
             title: None,
             data: SidebarTabData {
@@ -351,13 +292,14 @@ mod tests {
                     saved_url: None,
                 },
             },
+            parent_id: None,
         };
         assert_eq!(bookmark.title(), Some("Saved Title".to_string()));
     }
 
     #[test]
     fn test_bookmark_title_some() {
-        let bookmark = SidebarBookmark {
+        let bookmark = Bookmark {
             id: "123".to_string(),
             title: Some("Human Title".to_string()),
             data: SidebarTabData {
@@ -366,6 +308,7 @@ mod tests {
                     saved_url: None,
                 },
             },
+            parent_id: None,
         };
         assert_eq!(bookmark.title(), Some("Human Title".to_string()));
     }
