@@ -32,6 +32,7 @@ chrono = { version = "0", features = ["serde"] }
 # Binary-only dependencies
 alfrusco = { version = "0", path = "../alfrusco" }
 clap = "4.5"
+env_logger = "0.11"
 
 [dev-dependencies]
 tempfile = "3.10.1"
