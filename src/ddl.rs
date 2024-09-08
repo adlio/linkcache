@@ -22,8 +22,9 @@ impl Cache {
             );
 
 
-            CREATE TRIGGER IF NOT EXISTS links_insert AFTER INSERT ON links
+            CREATE TRIGGER IF NOT EXISTS links_upsert AFTER INSERT ON links
             BEGIN
+                DELETE FROM links_fts WHERE url = new.url AND title = new.title;
                 INSERT INTO links_fts
                 (url, title, subtitle, source, author)
                 VALUES
@@ -40,7 +41,7 @@ impl Cache {
             END;
 
 
-            CREATE TRIGGER IF NOT EXISTS links_delete AFTER DELETE ON links
+            CREATE TRIGGER IF NOT EXISTS links_delete BEFORE DELETE ON links
             BEGIN
                 DELETE FROM links_fts WHERE url = old.url;
             END;
