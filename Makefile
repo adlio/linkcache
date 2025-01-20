@@ -5,6 +5,10 @@ run:
 release:
 	cargo build --all-targets --all-features --release
 
+coverage:
+	cargo tarpaulin --all-targets --all-features --examples --exclude-files tests/* --out Html
+
+
 build_workflow: release
 	mkdir -p target/workflow && \
 	cp ./target/release/linkcache ./target/workflow
