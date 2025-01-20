@@ -9,3 +9,4 @@ pub use link::Link;
 
 pub mod arc;
 pub mod chrome;
+pub mod firefox;
