@@ -214,6 +214,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_create_places_replica() {
+        let browser = Browser::new().expect("Failed to create browser");
+        let res = browser.create_places_replica();
+        assert!(res.is_ok());
+    }
+
+    #[test]
     fn test_find_default_release_dir() {
         let path = Browser::find_default_release_dir().expect("Shouldn't fail");
         assert!(path.exists(), "Directory should exist")
