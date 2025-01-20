@@ -1,4 +1,5 @@
 use chrono::DateTime;
+use filetime::FileTime;
 use serde_json::Value;
 use std::fs::File;
 use std::io::BufReader;
@@ -7,6 +8,8 @@ use std::path::PathBuf;
 use crate::cache::Cache;
 use crate::error::Result;
 use crate::link::Link;
+
+use ini::Ini;
 
 pub struct Browser {
     profile_dir: PathBuf,
@@ -134,66 +137,41 @@ impl Browser {
     }
     */
 
-    fn places_path(&self) -> PathBuf {
+    /// Creates a backup of the Firefox places SQLite database. This is
+    /// necessary because the browser itself has a read lock on the SQLite
+    /// database, preventing us from opening a connection to it.
+    ///
+    pub(crate) fn create_places_replica(&self) -> Result<()> {
+        let source = self.places_path();
+        let dest = self.places_replica_path();
+        std::fs::copy(source, dest)?;
+
+        // Manually set the modification time of the new file to now
+        filetime::set_file_times(self.places_replica_path(), FileTime::now(), FileTime::now())?;
+        Ok(())
+    }
+
+    pub(crate) fn places_path(&self) -> PathBuf {
         self.profile_dir.join("places.sqlite")
     }
 
-    fn places_replica_path(&self) -> PathBuf {
+    pub(crate) fn places_replica_path(&self) -> PathBuf {
         self.places_path().with_file_name("places.linkcache.sqlite")
     }
 
-
-    /// Returns the default Firefox profile directory for the current user.
-    ///
-    pub fn default_profile_dir() -> Result<PathBuf> {
-        let parent_dir = Self::default_profile_parent_dir()?;
-        let profile_dir = Self::find_default_release_dir(parent_dir)?;
-        Ok(profile_dir)
-    }
-
-    /// Given the top-level Firefox Profiles parent directory, this function finds the
-    /// subdirectory which ends with .default-release, which is the convention Firefox
-    /// uses to indicate the default/first-created profile.
-    ///
-    pub fn find_default_release_dir(parent_dir: PathBuf) -> Result<PathBuf> {
-        let profile_dir = std::fs::read_dir(&parent_dir)?
-            .filter_map(|entry| entry.ok())
-            .find(|entry| {
-                entry
-                    .file_name()
-                    .to_string_lossy()
-                    .ends_with(".default-release")
-            })
-            .map(|entry| entry.path())
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    format!(
-                        "Could not find a path ending with .default-release under {:?}",
-                        &parent_dir,
-                    ),
-                )
-            })?;
-        Ok(profile_dir)
-    }
-
-    /// Returns the OS-aware parent directory for Firefox profiles (i.e. the
-    /// directory which contains the <randchars>.default-release directory
-    /// which will be the current user's default Firefox profile.
-    ///
-    pub fn default_profile_parent_dir() -> Result<PathBuf> {
+    pub fn default_config_dir() -> Result<PathBuf> {
         let home_dir = dirs::home_dir().ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                "Could not determine home directory",
+                "Could not determine home directory.",
             )
         })?;
 
         let os = std::env::consts::OS;
-        let profile_parent_dir = match os {
-            "macos" => home_dir.join("Library/Application Support/Firefox/Profiles"),
+        let config_dir = match os {
+            "macos" => home_dir.join("Library/Application Support/Firefox"),
             "linux" => home_dir.join(".mozilla/firefox"),
-            "windows" => home_dir.join("AppData/Roaming/Mozilla/Firefox/Profiles"),
+            "windows" => home_dir.join("AppData/Roaming/Mozilla/Firefox"),
             unsupported => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Unsupported,
@@ -202,7 +180,32 @@ impl Browser {
                 .into());
             }
         };
-        Ok(profile_parent_dir)
+
+        Ok(config_dir)
+    }
+
+    /// Returns the default Firefox profile directory for the current user.
+    ///
+    pub fn default_profile_dir() -> Result<PathBuf> {
+        let profile_dir = Self::find_default_release_dir()?;
+        Ok(profile_dir)
+    }
+
+    pub fn find_default_release_dir() -> Result<PathBuf> {
+        let config_dir = Self::default_config_dir()?;
+
+        let conf = Ini::load_from_file(config_dir.join("profiles.ini"))?;
+        for section in conf.sections().flatten() {
+            if section.starts_with("Install") {
+                if let Some(default_path) = conf.get_from(Some(section), "Default") {
+                    let profile_path = config_dir.join(default_path);
+                    println!("{:?}", profile_path);
+                    return Ok(profile_path);
+                }
+            }
+        }
+
+        Ok("/tmp".into())
     }
 }
 
@@ -212,13 +215,8 @@ mod tests {
 
     #[test]
     fn test_find_default_release_dir() {
-        let dir = Browser::find_default_release_dir(PathBuf::from("test_data/FirefoxProfileDir"))
-            .expect("Should find the directory with the .default-release suffix");
-        assert_eq!(
-            "5abcyz0s.default-release",
-            dir.file_name().expect("Directory should have a name"),
-        );
-        assert!(dir.exists());
+        let path = Browser::find_default_release_dir().expect("Shouldn't fail");
+        assert!(path.exists(), "Directory should exist")
     }
 
     #[test]

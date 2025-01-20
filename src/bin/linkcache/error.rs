@@ -6,6 +6,7 @@ pub enum WorkflowError {
     Alfrusco(alfrusco::Error),
     Linkcache(linkcache::Error),
     Io(std::io::Error),
+    Ini(ini::Error),
 }
 
 impl alfrusco::WorkflowError for WorkflowError {}
@@ -16,6 +17,7 @@ impl fmt::Display for WorkflowError {
             WorkflowError::Alfrusco(ref err) => err.fmt(f),
             WorkflowError::Linkcache(ref err) => err.fmt(f),
             WorkflowError::Io(ref err) => err.fmt(f),
+            WorkflowError::Ini(ref err) => err.fmt(f),
         }
     }
 }
@@ -26,6 +28,7 @@ impl Error for WorkflowError {
             WorkflowError::Alfrusco(ref err) => Some(err),
             WorkflowError::Linkcache(ref err) => Some(err),
             WorkflowError::Io(ref err) => Some(err),
+            WorkflowError::Ini(ref err) => Some(err),
         }
     }
 }
@@ -45,5 +48,11 @@ impl From<linkcache::Error> for WorkflowError {
 impl From<std::io::Error> for WorkflowError {
     fn from(value: std::io::Error) -> Self {
         WorkflowError::Io(value)
+    }
+}
+
+impl From<ini::Error> for WorkflowError {
+    fn from(value: ini::Error) -> Self {
+        WorkflowError::Ini(value)
     }
 }
