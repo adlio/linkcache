@@ -1,12 +1,13 @@
-run:
-	cargo build --features="bin" && \
-	./target/debug/linkcache
 
 release:
 	cargo build --all-targets --all-features --release
 
+run:
+	cargo build --features="bin" && \
+	./target/debug/linkcache
+
 coverage:
-	cargo tarpaulin --all-targets --all-features --examples --exclude-files tests/* --out Html
+	cargo tarpaulin --out Html
 
 
 build_workflow: release
