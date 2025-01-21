@@ -1,10 +1,11 @@
 use filetime::FileTime;
+use rusqlite::{params, Connection};
 use std::path::PathBuf;
 
 use crate::error::Result;
 
+use crate::{Error, Link};
 use ini::Ini;
-use crate::Error;
 
 /// Browser represents a particular instance of a Firefox profile for a specific
 /// user. At its core, this is a wrapper around the profile directory that stores
@@ -28,6 +29,38 @@ impl Browser {
     pub fn with_profile_dir(mut self, dir: PathBuf) -> Self {
         self.profile_dir = dir;
         self
+    }
+
+    /// Searches the places.sqlite database (actually a replica of it that we manage)
+    /// for all bookmarks that loosely match the provided string.
+    ///
+    pub fn search_bookmarks_directly(&self, query: impl ToString) -> Result<Vec<Link>> {
+        self.create_places_replica()?;
+
+        let path = self.places_replica_path();
+        match Connection::open(path) {
+            Err(err) => Err(err.into()),
+            Ok(conn) => {
+                let mut stmt = conn.prepare(
+                    "SELECT b.id, p.url, b.title
+                    FROM moz_bookmarks b 
+                    JOIN moz_places p ON b.fk = p.id 
+                    WHERE b.type = 1 AND (p.url LIKE ?1 OR b.title LIKE ?1)",
+                )?;
+                let query: String = query.to_string();
+                let links = stmt
+                    .query_map(params![format!("%{}%", query)], |row| {
+                        Ok(Link {
+                            url: row.get(1)?,
+                            title: row.get(2)?,
+                            ..Default::default()
+                        })
+                    })?
+                    .filter_map(|link| link.ok())
+                    .collect();
+                Ok(links)
+            }
+        }
     }
 
     /// Creates a backup of the Firefox places SQLite database. This is
@@ -107,7 +140,7 @@ impl Browser {
                     std::io::ErrorKind::Unsupported,
                     format!("Unsupported operating system: {}", unsupported),
                 )
-                    .into());
+                .into());
             }
         };
 
@@ -118,6 +151,18 @@ impl Browser {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_search_bookmarks_directly() {
+        let browser = Browser::new().expect("Failed to create browser");
+        let res = browser.search_bookmarks_directly("Wiki");
+        assert!(res.is_ok());
+        let links = res.unwrap();
+        assert!(!links.is_empty());
+        for link in links {
+            println!("{}: {}", link.title, link.url);
+        }
+    }
 
     #[test]
     fn test_create_places_replica() {
