@@ -47,25 +47,6 @@ impl Runnable for LinkCacheCLI {
             .collect();
         workflow.response.append_items(items);
 
-        /*
-        let cache = Cache::default()?;
-        let results = cache.search(&query)?;
-        info!("Found {} results from linkcache", results.len());
-
-        let items: Vec<Item> = results
-            .into_iter()
-            .map(|link| {
-                let mut item: Item = URLItem::new(&link.title, &link.url).into();
-                let subtitle = link.subtitle.unwrap_or_default();
-                item = item.subtitle(&subtitle);
-                item = item.matches(format!("{} / {}", subtitle, &link.title));
-                item
-            })
-            .collect();
-
-        workflow.response.append_items(items);
-        */
-
         // Allow Alfrusco to sort and filter the response
         workflow.set_filter_keyword(query.clone());
 
