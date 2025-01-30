@@ -1,5 +1,7 @@
 use filetime::FileTime;
+use log::error;
 use rusqlite::{params, Connection};
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::error::Result;
@@ -42,22 +44,38 @@ impl Browser {
             Err(err) => Err(err.into()),
             Ok(conn) => {
                 let mut stmt = conn.prepare(
-                    "SELECT b.id, p.url, b.title
+                    "SELECT p.url, b.title, 1 as rank
                     FROM moz_bookmarks b 
                     JOIN moz_places p ON b.fk = p.id 
-                    WHERE b.type = 1 AND (p.url LIKE ?1 OR b.title LIKE ?1)",
+                    WHERE b.type = 1 AND (p.url LIKE ?1 OR b.title LIKE ?1)
+                    UNION ALL
+                    SELECT p.url, p.title, 2 AS rank
+                    FROM moz_places p
+                    WHERE (p.url LIKE ?1 OR p.title LIKE ?1)
+                    ORDER BY rank, p.url, p.title
+                ",
                 )?;
                 let query: String = query.to_string();
-                let links = stmt
+                error!("Executing query with parameter: {}", query); // Debug statement
+                let mut seen_urls = HashSet::new();
+                let links: Vec<Link> = stmt
                     .query_map(params![format!("%{}%", query)], |row| {
-                        Ok(Link {
-                            url: row.get(1)?,
-                            title: row.get(2)?,
-                            ..Default::default()
-                        })
+                        let url: String = row.get(0)?;
+                        let title: String = row.get(1)?;
+                        error!("Found row: url={}, title={}", url, title); // Debug statement
+                        if seen_urls.insert(url.clone()) {
+                            Ok(Some(Link {
+                                url,
+                                title,
+                                ..Default::default()
+                            }))
+                        } else {
+                            Ok(None)
+                        }
                     })?
-                    .filter_map(|link| link.ok())
+                    .filter_map(|link| link.ok().flatten())
                     .collect();
+                error!("Total links found: {}", links.len()); // Debug statement
                 Ok(links)
             }
         }
