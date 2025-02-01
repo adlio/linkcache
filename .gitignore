@@ -19,5 +19,8 @@ Cargo.lock
 *.pdb
 
 # Idea config files
-.idea/aws.xml
+.idea/**/*
 .vscode
+
+# Code Coverage reports
+tarpaulin-report.html

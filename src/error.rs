@@ -4,6 +4,7 @@ use std::fmt;
 pub enum Error {
     Io(std::io::Error),
     Ini(ini::Error),
+    Migration(rusqlite_migration::Error),
     Parse(String),
     Serde(serde_json::Error),
     Rusqlite(rusqlite::Error),
@@ -16,6 +17,7 @@ impl fmt::Display for Error {
         match *self {
             Error::Io(ref err) => write!(f, "IO Error: {}", err),
             Error::Ini(ref err) => write!(f, "INI Error: {}", err),
+            Error::Migration(ref error) => write!(f, "Migration Error: {}", error),
             Error::Parse(ref desc) => write!(f, "Parse Error: {}", desc),
             Error::Serde(ref err) => write!(f, "Serde Error: {}", err),
             Error::Rusqlite(ref err) => write!(f, "Rusqlite Error: {}", err),
@@ -41,6 +43,12 @@ impl From<rusqlite::Error> for Error {
     }
 }
 
+impl From<rusqlite_migration::Error> for Error {
+    fn from(err: rusqlite_migration::Error) -> Error {
+        Error::Migration(err)
+    }
+}
+
 impl From<ini::Error> for Error {
     fn from(err: ini::Error) -> Error {
         Error::Ini(err)
@@ -53,6 +61,7 @@ impl std::error::Error for Error {
             Error::Ini(ref err) => Some(err),
             Error::Io(ref err) => Some(err),
             Error::Parse(_) => None,
+            Error::Migration(ref err) => Some(err),
             Error::Serde(ref err) => Some(err),
             Error::Rusqlite(ref err) => Some(err),
         }

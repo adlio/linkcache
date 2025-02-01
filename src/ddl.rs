@@ -1,52 +1,34 @@
-use crate::Cache;
+use lazy_static::lazy_static;
+use log::info;
+use rusqlite::Connection;
+use rusqlite_migration::{Migrations, M};
+
 use crate::Result;
 
-impl Cache {
-    /// Initializes the index, its schema, and custom tokenization
-    pub(crate) fn initialize(&self) -> Result<()> {
-        self.conn.execute_batch(
-            "
-            CREATE TABLE IF NOT EXISTS links (
-                url TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                subtitle TEXT,
-                source TEXT,
-                author TEXT,
-                timestamp TEXT NOT NULL
-            );
+lazy_static! {
+    static ref MIGRATIONS: Migrations<'static> = Migrations::new(vec![
+        M::up(include_str!("./migrations/001_CreateLinks.sql")),
+        M::up(include_str!("./migrations/002_CreateLinksFTS.sql")),
+    ]);
+}
 
+/// Runs an embedded set of SQL migrations to ensure the connected database
+/// has all appropriate DDL in place before the application begins operating
+///
+pub(crate) fn apply_migrations(conn: &mut Connection) -> Result<()> {
+    info!("Applying migrations...");
+    conn.pragma_update(None, "journal_mode", "WAL")?;
+    MIGRATIONS.to_latest(conn)?;
+    info!("Migrations completed");
+    Ok(())
+}
 
-            CREATE VIRTUAL TABLE IF NOT EXISTS links_fts USING fts5 (
-                url, title, subtitle, source, author,
-                tokenize='trigram'
-            );
+#[cfg(test)]
+mod test {
+    use super::MIGRATIONS;
 
-
-            CREATE TRIGGER IF NOT EXISTS links_upsert AFTER INSERT ON links
-            BEGIN
-                DELETE FROM links_fts WHERE url = new.url AND title = new.title;
-                INSERT INTO links_fts
-                (url, title, subtitle, source, author)
-                VALUES
-                (new.url, new.title, new.subtitle, new.source, new.author);
-            END;
-
-
-            CREATE TRIGGER IF NOT EXISTS links_update AFTER UPDATE ON links
-            BEGIN
-                INSERT OR REPLACE INTO links_fts
-                (url, title, subtitle, source, author)
-                VALUES
-                (new.url, new.title, new.subtitle, new.source, new.author);
-            END;
-
-
-            CREATE TRIGGER IF NOT EXISTS links_delete BEFORE DELETE ON links
-            BEGIN
-                DELETE FROM links_fts WHERE url = old.url;
-            END;
-            ",
-        )?;
-        Ok(())
+    #[test]
+    fn migrations_test() {
+        assert!(MIGRATIONS.validate().is_ok());
     }
 }

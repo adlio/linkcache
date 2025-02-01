@@ -10,30 +10,27 @@ default = ["lib"]
 lib = []
 bin = []
 
-
 [[bin]]
 name = "linkcache"
 path = "src/bin/linkcache/main.rs"
 required-features = ["bin"]
 
 [dependencies]
-dirs = "5"
-rusqlite = { version = "0", features = ["bundled", "chrono"] }
-image = "0"
+chrono = { version = "0", features = ["serde"] }
+dirs = "6"
+filetime = "0"
+itertools = "0"
+lazy_static = "1"
 log = "0"
-regex = "1"
+rusqlite = { version = "0", features = ["bundled", "chrono"] }
+rusqlite_migration = "1"
+rust-ini = "0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-filetime = "0"
-rust-ini = "0"
 sublime_fuzzy = "0"
-itertools = "0"
-chrono = { version = "0", features = ["serde"] }
+tempfile = "3.10.1"
 
 # Binary-only dependencies
 alfrusco = { version = "0", path = "../alfrusco" }
 clap = "4.5"
 env_logger = "0.11"
-
-[dev-dependencies]
-tempfile = "3.10.1"

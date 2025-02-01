@@ -1,25 +1,45 @@
+use std::env;
+use std::process::Command;
+use std::time::Duration;
 use alfrusco::{config, Item, Runnable, URLItem, Workflow};
 use clap::Parser;
 use linkcache::{firefox, Cache};
-use log::info;
+use log::{error, info};
 
 mod error;
 
 use error::WorkflowError;
 
-/// Simple program to greet a person
+const MAX_FIREFOX_AGE_IN_MINS: u64 = 5;
+
 #[derive(Parser, Debug)]
 #[command(author = "Aaron Longwell <aaron@adl.io>")]
 #[command(version = "0.1.0")]
-#[command(about = "Linkcache Utility")]
+#[command(about = "Alfred workflow to ")]
 #[command(version, about, long_about = None)]
 struct LinkCacheCLI {
+
+    #[clap(short, long, env)]
+    cache: bool,
+
     query: Vec<String>,
 }
 
 fn main() {
     env_logger::init();
     let command = LinkCacheCLI::parse();
+
+    if command.cache {
+        match update_cache() {
+            Ok(_) => {
+                return;
+            }
+            Err(e) => {
+                error!("Error updating cache: {}", e);
+                return;
+            }
+        }
+    }
 
     alfrusco::execute(&config::AlfredEnvProvider, command, &mut std::io::stdout());
 }
@@ -29,6 +49,12 @@ impl Runnable for LinkCacheCLI {
 
     fn run(self, workflow: &mut Workflow) -> Result<(), Self::Error> {
         info!("linkcache starting up");
+
+        workflow.run_in_background(
+            "firefox-update",
+            Duration::from_secs(60 * MAX_FIREFOX_AGE_IN_MINS),
+            firefox_update_cmd(),
+        );
 
         let query = self.query.join(" ").trim().to_string();
 
@@ -52,4 +78,31 @@ impl Runnable for LinkCacheCLI {
 
         Ok(())
     }
+}
+
+fn update_cache() -> Result<(), WorkflowError> {
+    /*
+    let mut cache = Cache::new()?;
+    let browser = firefox::Browser::new()?;
+    let links = browser.cache_bookmarks(&mut cache)?;
+     */
+    Ok(())
+}
+
+fn firefox_update_cmd() -> Command {
+    let mut cmd = Command::new(env::current_exe().expect("Couldn't determine current executable"));
+
+    cmd.args(vec!["--cache"]);
+
+    // Set the current working directory
+    if let Ok(current_dir) = env::current_dir() {
+        cmd.current_dir(current_dir);
+    }
+
+    // Set all environment variables
+    for (key, value) in env::vars() {
+        cmd.env(key, value);
+    }
+
+    cmd
 }

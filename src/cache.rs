@@ -1,34 +1,28 @@
-use rusqlite::{Connection, OpenFlags};
-use std::path::{Path, PathBuf};
-
 use crate::{error::Result, Link};
+use rusqlite::Connection;
 
+use crate::CacheBuilder;
+
+#[derive(Debug)]
 pub struct Cache {
     pub(crate) conn: Connection,
 }
 
 impl Cache {
-    /// Create a new Cache instance with the SQLite database at the provided
-    /// path. This could fail if the path doesn't exist, or the file isn't
-    /// writeable, or the initialization process (creation of tables,
-    /// triggers, etc) fails.
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let conn = Connection::open_with_flags(
-            path,
-            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
-        )?;
-        let cache = Cache { conn };
-        cache.initialize()?;
-        Ok(cache)
+    /// The primary entry point to create a new Cache instance. This function
+    /// will create a new Cache instance with the default data directory (~/.linkcache).
+    /// If you want to use a custom data directory, use the builder() function
+    /// instead.
+    ///
+    pub fn new() -> Result<Self> {
+        Self::builder().build()
     }
 
-    pub fn default() -> Result<Self> {
-        let cache_dir = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("/tmp"))
-            .join(".linkcache");
-        std::fs::create_dir_all(&cache_dir)?;
-        let db_path = cache_dir.join("linkcache.sqlite");
-        Self::new(db_path)
+    /// Builder pattern constructor. Use this to override the data directory
+    /// and other settings for the Cache.
+    ///
+    pub fn builder() -> CacheBuilder {
+        CacheBuilder::new()
     }
 
     /// Adds a new link to the index. The url field is used as the unique
@@ -37,8 +31,6 @@ impl Cache {
     /// to persist the changes. Batch updates should call add() many times
     /// and commit() once.
     pub fn add(&mut self, link: Link) -> Result<()> {
-        // let json_str = to_string(&link)?;
-
         self.conn.execute(
             "INSERT OR REPLACE INTO links (
                 url, title, subtitle,
@@ -125,38 +117,36 @@ impl Cache {
     }
 }
 
-/// Defines the Default implementaton for Cache.
+/// Defines the Default implementation for Cache.
 impl Default for Cache {
     fn default() -> Self {
-        Self::default().expect("Failed to create default cache")
+        Self::builder()
+            .build()
+            .expect("Failed to create default cache")
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::{tempdir, TempDir};
-
-    fn test_cache_instance() -> (Cache, TempDir) {
-        let binding = tempdir().expect("Failed to create temp dir");
-        let temp_dir = binding.path();
-        let cache = Cache::new(temp_dir.join("test.sqlite")).expect("Failed to create test cache");
-        (cache, binding)
-    }
+    use crate::testutils;
 
     #[test]
     fn test_add_and_search_fuzzy() -> Result<()> {
-        let (mut cache, _temp_dir) = test_cache_instance();
+        let (mut cache, _temp_dir) = testutils::create_test_cache();
+
         cache.add(Link {
             title: "Visual Studio Code".to_string(),
             url: "https://code.visualstudio.com".to_string(),
             ..Default::default()
         })?;
+
         cache.add(Link {
             title: "Sublime Text".to_string(),
             url: "https://www.sublimetext.com".to_string(),
             ..Default::default()
         })?;
+
         let results = cache.search("Vis studio")?;
         assert!(!results.is_empty());
         assert_eq!(results[0].title, "Visual Studio Code");

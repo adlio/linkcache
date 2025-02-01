@@ -3,11 +3,11 @@ use log::error;
 use rusqlite::{params, Connection};
 use std::collections::HashSet;
 use std::path::PathBuf;
+use ini::Ini;
 
 use crate::error::Result;
 
-use crate::{Error, Link};
-use ini::Ini;
+use crate::{Error, Link, Cache};
 
 /// Browser represents a particular instance of a Firefox profile for a specific
 /// user. At its core, this is a wrapper around the profile directory that stores
@@ -33,42 +33,46 @@ impl Browser {
         self
     }
 
+    pub fn cache_bookmarks(&self, cache: &mut Cache) -> Result<()> {
+        let links = self.bookmark_links()?;
+        for link in links {
+            cache.add(link)?;
+        }
+        Ok(())
+    }
+
     /// Searches the places.sqlite database (actually a replica of it that we manage)
     /// for all bookmarks that loosely match the provided string.
     ///
     pub fn search_bookmarks_directly(&self, query: impl ToString) -> Result<Vec<Link>> {
+        self.bookmark_links()
+    }
+
+    pub fn bookmark_links(&self) -> Result<Vec<Link>> {
         self.create_places_replica()?;
 
         let path = self.places_replica_path();
         match Connection::open(path) {
-            Err(err) => Err(err.into()),
             Ok(conn) => {
                 let mut stmt = conn.prepare(
                     "SELECT p.url, b.title, 1 as rank
-                    FROM moz_bookmarks b 
-                    JOIN moz_places p ON b.fk = p.id 
-                    WHERE b.type = 1 AND (p.url LIKE ?1 OR b.title LIKE ?1)
+                    FROM moz_bookmarks b
+                    JOIN moz_places p ON b.fk = p.id
+                    WHERE b.type = 1
                     UNION ALL
                     SELECT p.url, p.title, 2 AS rank
                     FROM moz_places p
-                    WHERE (p.url LIKE ?1 OR p.title LIKE ?1)
                     ORDER BY rank, p.url, p.title
                 ",
                 )?;
-                let query: String = query.to_string();
-                error!("Executing query with parameter: {}", query); // Debug statement
                 let mut seen_urls = HashSet::new();
                 let links: Vec<Link> = stmt
-                    .query_map(params![format!("%{}%", query)], |row| {
+                    .query_map(params![], |row| {
                         let url: String = row.get(0)?;
                         let title: String = row.get(1)?;
                         error!("Found row: url={}, title={}", url, title); // Debug statement
                         if seen_urls.insert(url.clone()) {
-                            Ok(Some(Link {
-                                url,
-                                title,
-                                ..Default::default()
-                            }))
+                            Ok(Some(Link::new(url.clone(), title).with_subtitle(url)))
                         } else {
                             Ok(None)
                         }
@@ -78,6 +82,7 @@ impl Browser {
                 error!("Total links found: {}", links.len()); // Debug statement
                 Ok(links)
             }
+            Err(err) => Err(err.into()),
         }
     }
 
