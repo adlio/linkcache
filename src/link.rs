@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+/// Link represents the unique combination of a URL and Title.
+///
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Link {
     pub url: String,
@@ -47,5 +49,56 @@ impl Link {
     pub fn with_author(mut self, author: String) -> Self {
         self.author = Some(author);
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_link_new() {
+        let link = Link::new("https://example.com".to_string(), "Example".to_string());
+        assert_eq!(link.url, "https://example.com");
+        assert_eq!(link.title, "Example");
+    }
+
+    #[test]
+    fn test_link_with_subtitle() {
+        let link = Link::new(
+            "https://www.subtitle.com".to_string(),
+            "Example with Subtitle".to_string(),
+        )
+        .with_subtitle("Subtitle".to_string());
+        assert_eq!(link.url, "https://www.subtitle.com");
+        assert_eq!(link.title, "Example with Subtitle");
+        assert_eq!(link.subtitle, Some("Subtitle".to_string()));
+    }
+
+    #[test]
+    fn test_link_with_author() {
+        let link = Link::new(
+            "https://www.author.com".to_string(),
+            "Example with Author".to_string(),
+        )
+        .with_author("Author".to_string());
+        assert_eq!(link.url, "https://www.author.com");
+        assert_eq!(link.title, "Example with Author");
+        assert_eq!(link.author, Some("Author".to_string()));
+    }
+
+    #[test]
+    fn test_link_with_timestamp_seconds() {
+        // Get current timestamp
+        let timestamp = chrono::Utc::now().timestamp();
+
+        let link = Link::new(
+            "https://a.com".to_string(),
+            "Example with Timestamp".to_string(),
+        )
+        .with_timestamp_seconds(timestamp);
+        assert_eq!(link.url, "https://a.com");
+        assert_eq!(link.title, "Example with Timestamp");
+        assert_eq!(link.timestamp.timestamp(), timestamp);
     }
 }
