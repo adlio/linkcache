@@ -1,7 +1,7 @@
-use crate::{error::Result, Link};
 use rusqlite::Connection;
 
 use crate::CacheBuilder;
+use crate::{error::Result, Link};
 
 #[derive(Debug)]
 pub struct Cache {
@@ -117,7 +117,8 @@ impl Cache {
     }
 }
 
-/// Defines the Default implementation for Cache.
+/// Creates a Cache instance with the default storage directory.
+/// This will panic if the cache fails to create in the default location.
 impl Default for Cache {
     fn default() -> Self {
         Self::builder()
@@ -131,10 +132,7 @@ mod tests {
     use super::*;
     use crate::testutils;
 
-    #[test]
-    fn test_add_and_search_fuzzy() -> Result<()> {
-        let (mut cache, _temp_dir) = testutils::create_test_cache();
-
+    fn add_link_fixtures(cache: &mut Cache) -> Result<()> {
         cache.add(Link {
             title: "Visual Studio Code".to_string(),
             url: "https://code.visualstudio.com".to_string(),
@@ -147,6 +145,44 @@ mod tests {
             ..Default::default()
         })?;
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_top_n() -> Result<()> {
+        let (mut cache, _temp_dir) = testutils::create_test_cache();
+        add_link_fixtures(&mut cache)?;
+        let results = cache.get_latest_n(2)?;
+        assert_eq!(results.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn test_removal() -> Result<()> {
+        let (mut cache, _temp_dir) = testutils::create_test_cache();
+        add_link_fixtures(&mut cache)?;
+        cache.remove(&Link {
+            url: "https://www.sublimetext.com".to_string(),
+            ..Default::default()
+        })?;
+        let results = cache.search("Sublime")?;
+        assert!(results.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_search_empty() -> Result<()> {
+        let (mut cache, _temp_dir) = testutils::create_test_cache();
+        add_link_fixtures(&mut cache)?;
+        let results = cache.search("")?;
+        assert!(!results.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_search_fuzzy() -> Result<()> {
+        let (mut cache, _temp_dir) = testutils::create_test_cache();
+        add_link_fixtures(&mut cache)?;
         let results = cache.search("Vis studio")?;
         assert!(!results.is_empty());
         assert_eq!(results[0].title, "Visual Studio Code");
