@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use rusqlite::Connection;
 
 use crate::CacheBuilder;
@@ -5,6 +6,7 @@ use crate::{error::Result, Link};
 
 #[derive(Debug)]
 pub struct Cache {
+    pub data_dir: PathBuf,
     pub(crate) conn: Connection,
 }
 

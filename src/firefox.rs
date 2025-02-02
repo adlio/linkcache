@@ -1,13 +1,13 @@
 use filetime::FileTime;
+use ini::Ini;
 use log::error;
 use rusqlite::{params, Connection};
 use std::collections::HashSet;
 use std::path::PathBuf;
-use ini::Ini;
 
 use crate::error::Result;
 
-use crate::{Error, Link, Cache};
+use crate::{Cache, Error, Link};
 
 /// Browser represents a particular instance of a Firefox profile for a specific
 /// user. At its core, this is a wrapper around the profile directory that stores
@@ -34,7 +34,7 @@ impl Browser {
     }
 
     pub fn cache_bookmarks(&self, cache: &mut Cache) -> Result<()> {
-        let links = self.bookmark_links()?;
+        let links = self.all_bookmarks(&cache)?;
         for link in links {
             cache.add(link)?;
         }
@@ -44,38 +44,33 @@ impl Browser {
     /// Searches the places.sqlite database (actually a replica of it that we manage)
     /// for all bookmarks that loosely match the provided string.
     ///
-    pub fn search_bookmarks_directly(&self, query: impl ToString) -> Result<Vec<Link>> {
-        self.bookmark_links()
+    pub fn search_bookmarks_directly(
+        &self,
+        cache: &Cache,
+        query: impl ToString,
+    ) -> Result<Vec<Link>> {
+        self.all_bookmarks(cache)
     }
 
-    pub fn bookmark_links(&self) -> Result<Vec<Link>> {
-        self.create_places_replica()?;
+    /// Extracts all Bookmarks from the Firefox Browser as Link objects. We require
+    /// a non-mutable Cache because Firefox holds a read lock on the places.sqlite
+    /// database, so we copy the file into the data_dir so that we can query from it.
+    ///
+    pub fn all_bookmarks(&self, cache: &Cache) -> Result<Vec<Link>> {
+        self.create_places_replica(cache)?;
 
-        let path = self.places_replica_path();
+        let path = self.places_replica_path(cache);
         match Connection::open(path) {
             Ok(conn) => {
-                let mut stmt = conn.prepare(
-                    "SELECT p.url, b.title, 1 as rank
-                    FROM moz_bookmarks b
-                    JOIN moz_places p ON b.fk = p.id
-                    WHERE b.type = 1
-                    UNION ALL
-                    SELECT p.url, p.title, 2 AS rank
-                    FROM moz_places p
-                    ORDER BY rank, p.url, p.title
-                ",
-                )?;
-                let mut seen_urls = HashSet::new();
+                let mut stmt = conn.prepare(include_str!("./queries/all_firefox_bookmarks.sql"))?;
                 let links: Vec<Link> = stmt
                     .query_map(params![], |row| {
-                        let url: String = row.get(0)?;
-                        let title: String = row.get(1)?;
-                        error!("Found row: url={}, title={}", url, title); // Debug statement
-                        if seen_urls.insert(url.clone()) {
-                            Ok(Some(Link::new(url.clone(), title).with_subtitle(url)))
-                        } else {
-                            Ok(None)
-                        }
+                        let _guid: String = row.get(0)?;
+                        let url: String = row.get(1)?;
+                        let title: String = row.get(2)?;
+                        let subtitle: String = row.get(3)?;
+                        let link = Link::new(url, title).with_subtitle(subtitle);
+                        Ok(Some(link))
                     })?
                     .filter_map(|link| link.ok().flatten())
                     .collect();
@@ -91,13 +86,13 @@ impl Browser {
     /// database, preventing us from opening a connection to it. This function
     /// replaces any existing replica file regardless of its age.
     ///
-    pub(crate) fn create_places_replica(&self) -> Result<()> {
+    pub(crate) fn create_places_replica(&self, cache: &Cache) -> Result<()> {
         let source = self.places_path();
-        let dest = self.places_replica_path();
-        std::fs::copy(source, dest)?;
+        let dest = self.places_replica_path(cache);
+        std::fs::copy(source, &dest)?;
 
         // Manually set the modification time of the new file to now
-        filetime::set_file_times(self.places_replica_path(), FileTime::now(), FileTime::now())?;
+        filetime::set_file_times(dest, FileTime::now(), FileTime::now())?;
         Ok(())
     }
 
@@ -107,11 +102,10 @@ impl Browser {
         self.profile_dir.join("places.sqlite")
     }
 
-    /// Returns the full path to the places.sqlite replica. Unlike places_path,
-    /// we should actually be allowed to run SQL queries on this database.
+    /// Returns the full path to the location of the places.sqlite replica file inside our cache.
     ///
-    pub(crate) fn places_replica_path(&self) -> PathBuf {
-        self.places_path().with_file_name("places.linkcache.sqlite")
+    pub(crate) fn places_replica_path(&self, cache: &Cache) -> PathBuf {
+        cache.data_dir.join("firefox-places.sqlite")
     }
 
     /// Returns the default Firefox profile directory for the current user.
@@ -174,11 +168,13 @@ impl Browser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testutils::create_test_cache;
 
     #[test]
     fn test_search_bookmarks_directly() {
+        let (cache, _tmpdir) = create_test_cache();
         let browser = Browser::new().expect("Failed to create browser");
-        let res = browser.search_bookmarks_directly("Wiki");
+        let res = browser.search_bookmarks_directly(&cache, "Wiki");
         assert!(res.is_ok());
         let links = res.unwrap();
         assert!(!links.is_empty());
@@ -189,8 +185,9 @@ mod tests {
 
     #[test]
     fn test_create_places_replica() {
+        let (cache, _tmpdir) = create_test_cache();
         let browser = Browser::new().expect("Failed to create browser");
-        let res = browser.create_places_replica();
+        let res = browser.create_places_replica(&cache);
         assert!(res.is_ok());
     }
 

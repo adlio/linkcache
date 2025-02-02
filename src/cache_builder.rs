@@ -13,7 +13,6 @@ impl CacheBuilder {
         Self::default()
     }
 
-    ///
     pub fn with_data_dir<P: AsRef<Path>>(mut self, data_dir: P) -> Self {
         let path: PathBuf = data_dir.as_ref().to_path_buf();
         self.data_dir = Some(path);
@@ -33,7 +32,7 @@ impl CacheBuilder {
 
         apply_migrations(&mut conn)?;
 
-        Ok(Cache { conn })
+        Ok(Cache { conn, data_dir })
     }
 
     /// Returns the default data directory to be used when creating Cache

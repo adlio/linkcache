@@ -1,10 +1,10 @@
-use std::env;
-use std::process::Command;
-use std::time::Duration;
 use alfrusco::{config, Item, Runnable, URLItem, Workflow};
 use clap::Parser;
 use linkcache::{firefox, Cache};
 use log::{error, info};
+use std::env;
+use std::process::Command;
+use std::time::Duration;
 
 mod error;
 
@@ -18,7 +18,6 @@ const MAX_FIREFOX_AGE_IN_MINS: u64 = 5;
 #[command(about = "Alfred workflow to ")]
 #[command(version, about, long_about = None)]
 struct LinkCacheCLI {
-
     #[clap(short, long, env)]
     cache: bool,
 
@@ -58,8 +57,9 @@ impl Runnable for LinkCacheCLI {
 
         let query = self.query.join(" ").trim().to_string();
 
+        let cache = Cache::new()?;
         let browser = firefox::Browser::new()?;
-        let links = browser.search_bookmarks_directly(&query)?;
+        let links = browser.search_bookmarks_directly(&cache, &query)?;
 
         let items: Vec<Item> = links
             .into_iter()
