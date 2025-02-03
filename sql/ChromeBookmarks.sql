@@ -1,0 +1,3 @@
+-- Chrome doesn't store bookmarks in SQLite
+-- They're stored as JSON at this path:
+-- ~/Library/Application Support/Google/Chrome/Default/Bookmarks

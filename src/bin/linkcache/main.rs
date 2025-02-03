@@ -51,7 +51,8 @@ impl Runnable for LinkCacheCLI {
 
         workflow.run_in_background(
             "firefox-update",
-            Duration::from_secs(60 * MAX_FIREFOX_AGE_IN_MINS),
+            // Duration::from_secs(60 * MAX_FIREFOX_AGE_IN_MINS),
+            Duration::from_secs(30),
             firefox_update_cmd(),
         );
 
@@ -59,7 +60,8 @@ impl Runnable for LinkCacheCLI {
 
         let cache = Cache::new()?;
         let browser = firefox::Browser::new()?;
-        let links = browser.search_bookmarks_directly(&cache, &query)?;
+        // let links = browser.search_bookmarks_directly(&cache, &query)?;
+        let links = cache.search(&query)?;
 
         let items: Vec<Item> = links
             .into_iter()
@@ -81,14 +83,15 @@ impl Runnable for LinkCacheCLI {
 }
 
 fn update_cache() -> Result<(), WorkflowError> {
-    /*
     let mut cache = Cache::new()?;
     let browser = firefox::Browser::new()?;
-    let links = browser.cache_bookmarks(&mut cache)?;
-     */
+    browser.cache_bookmarks(&mut cache)?;
     Ok(())
 }
 
+/// TODO This could be made more generic with improvements to
+/// alfrusco.
+///
 fn firefox_update_cmd() -> Command {
     let mut cmd = Command::new(env::current_exe().expect("Couldn't determine current executable"));
 

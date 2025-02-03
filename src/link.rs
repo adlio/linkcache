@@ -1,33 +1,49 @@
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 
 /// Link represents the unique combination of a URL and Title.
 ///
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Link {
+    /// Globally unique identifier for the Link. Firefox
+    /// has native GUIDs for all its links. For Chrome
+    /// and Markdown sources we'll need to identify a
+    /// deterministic mechanism to create a GUID for
+    /// each link.
+    pub guid: String,
+
+    /// The fully-qualified URL for this link
     pub url: String,
 
+    /// The name displayed when linking to this URL.
+    /// There can be more than one title for the same URL.
     pub title: String,
 
+    /// Optional description of the link.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subtitle: Option<String>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub author: Option<String>,
-
+    /// Unique identifier for the place from where
+    /// this link was discovered. Will be "firefox"
+    /// or "chrome," or similar.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
 
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: DateTime<chrono::Utc>,
 
+    /// The relevancy score for this link in fulltext
+    /// search results. This value isn't persisted in
+    /// the database, and it will be None for Link
+    /// structs being inserted to the database.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub score: Option<f32>,
 }
 
 impl Link {
-    pub fn new(url: String, title: String) -> Link {
+    pub fn new(guid: String, url: String, title: String) -> Link {
         let timestamp = chrono::Utc::now();
         Link {
+            guid,
             url,
             title,
             timestamp,
@@ -45,11 +61,6 @@ impl Link {
         self.timestamp = timestamp.expect("Failed to create timestamp");
         self
     }
-
-    pub fn with_author(mut self, author: String) -> Self {
-        self.author = Some(author);
-        self
-    }
 }
 
 #[cfg(test)]
@@ -58,7 +69,11 @@ mod tests {
 
     #[test]
     fn test_link_new() {
-        let link = Link::new("https://example.com".to_string(), "Example".to_string());
+        let link = Link::new(
+            "test1".to_string(),
+            "https://example.com".to_string(),
+            "Example".to_string(),
+        );
         assert_eq!(link.url, "https://example.com");
         assert_eq!(link.title, "Example");
     }
@@ -66,6 +81,7 @@ mod tests {
     #[test]
     fn test_link_with_subtitle() {
         let link = Link::new(
+            "test2".to_string(),
             "https://www.subtitle.com".to_string(),
             "Example with Subtitle".to_string(),
         )
@@ -76,23 +92,12 @@ mod tests {
     }
 
     #[test]
-    fn test_link_with_author() {
-        let link = Link::new(
-            "https://www.author.com".to_string(),
-            "Example with Author".to_string(),
-        )
-        .with_author("Author".to_string());
-        assert_eq!(link.url, "https://www.author.com");
-        assert_eq!(link.title, "Example with Author");
-        assert_eq!(link.author, Some("Author".to_string()));
-    }
-
-    #[test]
     fn test_link_with_timestamp_seconds() {
         // Get current timestamp
         let timestamp = chrono::Utc::now().timestamp();
 
         let link = Link::new(
+            "test3".to_string(),
             "https://a.com".to_string(),
             "Example with Timestamp".to_string(),
         )

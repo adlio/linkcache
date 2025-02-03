@@ -41,19 +41,6 @@ FROM moz_bookmarks b
          INNER JOIN bookmark_folder_paths fp ON b.parent = fp.id
          INNER JOIN moz_origins o ON o.id = p.origin_id
 WHERE b.type = 1 -- Only actual bookmarks
+AND p.guid IN ('44EG8dAVYJXq')
 ORDER BY subtitle, title;
 
-
-SELECT id,
-       parent,
-       title,
-       title as folder_path,
-       1 as level
-FROM moz_bookmarks
-WHERE parent IN (2, 3) -- menu and toolbar folders
-  AND type = 2; -- Only folders
-
-
-SELECT * FROM moz_origins;
-
-SELECT * FROM moz_places;

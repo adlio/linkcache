@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use rusqlite::Connection;
+use std::path::PathBuf;
 
 use crate::CacheBuilder;
 use crate::{error::Result, Link};
@@ -35,8 +35,8 @@ impl Cache {
     pub fn add(&mut self, link: Link) -> Result<()> {
         self.conn.execute(
             "INSERT OR REPLACE INTO links (
-                url, title, subtitle,
-                source, author,
+                guid, url, title,
+                subtitle, source,
                 timestamp
             ) VALUES (
                 ?1, ?2, ?3,
@@ -44,11 +44,11 @@ impl Cache {
                 ?6
             )",
             (
+                &link.guid,
                 &link.url,
                 &link.title,
                 &link.subtitle,
                 &link.source,
-                &link.author,
                 &link.timestamp,
             ),
         )?;
@@ -70,19 +70,23 @@ impl Cache {
         }
 
         let mut stmt = self.conn.prepare(
-            "SELECT links.* FROM links_fts
-             JOIN links ON links_fts.url = links.url
+            "SELECT 
+             links.guid, links.url, links.title,
+             links.subtitle, links.source,
+             links.timestamp
+             FROM links_fts
+             JOIN links ON links_fts.guid = links.guid
              WHERE links_fts MATCH ?1
              ORDER BY rank",
         )?;
 
         let links_iter = stmt.query_map([query], |row| {
             Ok(Link {
-                url: row.get(0)?,
-                title: row.get(1)?,
-                subtitle: row.get(2)?,
-                source: row.get(3)?,
-                author: row.get(4)?,
+                guid: row.get(0)?,
+                url: row.get(1)?,
+                title: row.get(2)?,
+                subtitle: row.get(3)?,
+                source: row.get(4)?,
                 timestamp: row.get(5)?,
                 ..Default::default()
             })
@@ -95,19 +99,19 @@ impl Cache {
 
     pub fn get_latest_n(&self, n: u32) -> Result<Vec<Link>> {
         let mut stmt = self.conn.prepare(
-            "SELECT url, title, subtitle, source, author, timestamp 
-             FROM links 
+            "SELECT guid, url, title, subtitle, source, timestamp
+             FROM links
              ORDER BY timestamp DESC 
              LIMIT ?",
         )?;
 
         let links_iter = stmt.query_map([n], |row| {
             Ok(Link {
-                url: row.get(0)?,
-                title: row.get(1)?,
-                subtitle: row.get(2)?,
-                source: row.get(3)?,
-                author: row.get(4)?,
+                guid: row.get(0)?,
+                url: row.get(1)?,
+                title: row.get(2)?,
+                subtitle: row.get(3)?,
+                source: row.get(4)?,
                 timestamp: row.get(5)?,
                 ..Default::default()
             })

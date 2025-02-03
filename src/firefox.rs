@@ -34,7 +34,8 @@ impl Browser {
     }
 
     pub fn cache_bookmarks(&self, cache: &mut Cache) -> Result<()> {
-        let links = self.all_bookmarks(&cache)?;
+        self.create_places_replica(cache)?;
+        let links = self.all_bookmarks(cache)?;
         for link in links {
             cache.add(link)?;
         }
@@ -49,6 +50,7 @@ impl Browser {
         cache: &Cache,
         query: impl ToString,
     ) -> Result<Vec<Link>> {
+        self.create_places_replica(cache)?;
         self.all_bookmarks(cache)
     }
 
@@ -57,24 +59,49 @@ impl Browser {
     /// database, so we copy the file into the data_dir so that we can query from it.
     ///
     pub fn all_bookmarks(&self, cache: &Cache) -> Result<Vec<Link>> {
-        self.create_places_replica(cache)?;
-
         let path = self.places_replica_path(cache);
         match Connection::open(path) {
             Ok(conn) => {
                 let mut stmt = conn.prepare(include_str!("./queries/all_firefox_bookmarks.sql"))?;
+                // TODO Don't repeat this
                 let links: Vec<Link> = stmt
                     .query_map(params![], |row| {
-                        let _guid: String = row.get(0)?;
+                        let guid: String = row.get(0)?;
                         let url: String = row.get(1)?;
                         let title: String = row.get(2)?;
                         let subtitle: String = row.get(3)?;
-                        let link = Link::new(url, title).with_subtitle(subtitle);
+                        let link = Link::new(guid, url, title).with_subtitle(subtitle);
                         Ok(Some(link))
                     })?
                     .filter_map(|link| link.ok().flatten())
                     .collect();
                 error!("Total links found: {}", links.len()); // Debug statement
+                Ok(links)
+            }
+            Err(err) => Err(err.into()),
+        }
+    }
+
+    /// Fetches an in-memory copy of the ENTIRE Firefox history information.
+    /// TODO Use batched iteration over history data.
+    pub fn all_history(&self, cache: &Cache) -> Result<Vec<Link>> {
+        let path = self.places_replica_path(cache);
+        match Connection::open(path) {
+            Ok(conn) => {
+                let mut stmt = conn.prepare(include_str!("./queries/all_firefox_history.sql"))?;
+                // TODO Don't repeat this
+                let links: Vec<Link> = stmt
+                    .query_map(params![], |row| {
+                        let guid: String = row.get(0)?;
+                        let url: String = row.get(1)?;
+                        let title: String = row.get(2)?;
+                        let subtitle: String = row.get(3)?;
+                        let link = Link::new(guid, url, title).with_subtitle(subtitle);
+                        Ok(Some(link))
+                    })?
+                    .filter_map(|link| link.ok().flatten())
+                    .collect();
+                error!("Total history links found: {}", links.len()); // Debug statement
                 Ok(links)
             }
             Err(err) => Err(err.into()),

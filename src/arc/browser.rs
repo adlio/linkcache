@@ -39,7 +39,7 @@ impl Browser {
         for bookmark in bookmarks {
             let title = bookmark.title().unwrap_or_default();
             let url = bookmark.data.tab.saved_url.unwrap_or_default();
-            let mut link = Link::new(url, title);
+            let mut link = Link::new(format!("arc-{}", url), url, title);
             if let Some(parent_id) = bookmark.parent_id {
                 let ancestor_titles = state.ancestor_titles(&parent_id)?;
                 if !ancestor_titles.is_empty() {
