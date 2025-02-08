@@ -70,7 +70,7 @@ impl Cache {
         }
 
         let mut stmt = self.conn.prepare(
-            "SELECT 
+            "SELECT
              links.guid, links.url, links.title,
              links.subtitle, links.source,
              links.timestamp
