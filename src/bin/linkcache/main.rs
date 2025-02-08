@@ -10,7 +10,7 @@ mod error;
 
 use error::WorkflowError;
 
-const MAX_FIREFOX_AGE_IN_MINS: u64 = 5;
+const MAX_FIREFOX_AGE_IN_MINS: u64 = 2;
 
 #[derive(Parser, Debug)]
 #[command(author = "Aaron Longwell <aaron@adl.io>")]
@@ -51,19 +51,14 @@ impl Runnable for LinkCacheCLI {
 
         workflow.run_in_background(
             "firefox-update",
-            // Duration::from_secs(60 * MAX_FIREFOX_AGE_IN_MINS),
-            Duration::from_secs(30),
+            Duration::from_secs(60 * MAX_FIREFOX_AGE_IN_MINS),
             firefox_update_cmd(),
         );
 
         let query = self.query.join(" ").trim().to_string();
 
         let cache = Cache::new()?;
-        let browser = firefox::Browser::new()?;
-        // let links = browser.search_bookmarks_directly(&cache, &query)?;
-        let links = cache.search(&query)?;
-
-        let items: Vec<Item> = links
+        let items: Vec<Item> = cache.search(&query)?
             .into_iter()
             .map(|link| {
                 let mut item: Item = URLItem::new(&link.title, &link.url).into();
@@ -73,6 +68,7 @@ impl Runnable for LinkCacheCLI {
                 item
             })
             .collect();
+        info!("Found {} matching results in cache", items.len());
         workflow.response.append_items(items);
 
         // Allow Alfrusco to sort and filter the response

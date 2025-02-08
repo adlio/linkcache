@@ -2,7 +2,6 @@ use filetime::FileTime;
 use ini::Ini;
 use log::error;
 use rusqlite::{params, Connection};
-use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::error::Result;
@@ -40,18 +39,6 @@ impl Browser {
             cache.add(link)?;
         }
         Ok(())
-    }
-
-    /// Searches the places.sqlite database (actually a replica of it that we manage)
-    /// for all bookmarks that loosely match the provided string.
-    ///
-    pub fn search_bookmarks_directly(
-        &self,
-        cache: &Cache,
-        query: impl ToString,
-    ) -> Result<Vec<Link>> {
-        self.create_places_replica(cache)?;
-        self.all_bookmarks(cache)
     }
 
     /// Extracts all Bookmarks from the Firefox Browser as Link objects. We require
@@ -196,19 +183,6 @@ impl Browser {
 mod tests {
     use super::*;
     use crate::testutils::create_test_cache;
-
-    #[test]
-    fn test_search_bookmarks_directly() {
-        let (cache, _tmpdir) = create_test_cache();
-        let browser = Browser::new().expect("Failed to create browser");
-        let res = browser.search_bookmarks_directly(&cache, "Wiki");
-        assert!(res.is_ok());
-        let links = res.unwrap();
-        assert!(!links.is_empty());
-        for link in links {
-            println!("{}: {}", link.title, link.url);
-        }
-    }
 
     #[test]
     fn test_create_places_replica() {
