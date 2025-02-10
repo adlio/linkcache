@@ -32,8 +32,14 @@ impl Browser {
         self
     }
 
+    pub fn cache_history(&self, cache: &mut Cache) -> Result<()> {
+        for link in self.all_history(cache)? {
+            cache.add(link)?;
+        }
+        Ok(())
+    }
+
     pub fn cache_bookmarks(&self, cache: &mut Cache) -> Result<()> {
-        self.create_places_replica(cache)?;
         let links = self.all_bookmarks(cache)?;
         for link in links {
             cache.add(link)?;
@@ -82,8 +88,7 @@ impl Browser {
                         let guid: String = row.get(0)?;
                         let url: String = row.get(1)?;
                         let title: String = row.get(2)?;
-                        let subtitle: String = row.get(3)?;
-                        let link = Link::new(guid, url, title).with_subtitle(subtitle);
+                        let link = Link::new(guid, url, title);
                         Ok(Some(link))
                     })?
                     .filter_map(|link| link.ok().flatten())
@@ -100,7 +105,7 @@ impl Browser {
     /// database, preventing us from opening a connection to it. This function
     /// replaces any existing replica file regardless of its age.
     ///
-    pub(crate) fn create_places_replica(&self, cache: &Cache) -> Result<()> {
+    pub fn create_places_replica(&self, cache: &Cache) -> Result<()> {
         let source = self.places_path();
         let dest = self.places_replica_path(cache);
         std::fs::copy(source, &dest)?;

@@ -6,6 +6,10 @@ run:
 	cargo build --features="bin" && \
 	./target/debug/linkcache
 
+cache:
+	cargo build --features="bin" && \
+		./target/debug/linkcache --cache
+
 coverage:
 	cargo tarpaulin --out Html
 

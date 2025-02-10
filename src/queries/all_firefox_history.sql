@@ -6,7 +6,11 @@ SELECT p.guid,
        COALESCE(o.frecency, 0)                  as origin_frecency
 FROM moz_places p
          LEFT JOIN moz_origins o ON o.id = p.origin_id
-ORDER BY frecency DESC;
+WHERE 1 = 1
+  AND (
+    (p.frecency >= 500)
+        OR (p.frecency >= 100 AND o.frecency >= 1000)
+    )
+  AND p.url NOT LIKE 'https://www.google.com/search%'
+ORDER BY frecency DESC LIMIT 5000;
 
-SELECT *
-FROM moz_origins;

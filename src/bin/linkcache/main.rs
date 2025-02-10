@@ -58,7 +58,8 @@ impl Runnable for LinkCacheCLI {
         let query = self.query.join(" ").trim().to_string();
 
         let cache = Cache::new()?;
-        let items: Vec<Item> = cache.search(&query)?
+        let items: Vec<Item> = cache
+            .search(&query)?
             .into_iter()
             .map(|link| {
                 let mut item: Item = URLItem::new(&link.title, &link.url).into();
@@ -81,7 +82,9 @@ impl Runnable for LinkCacheCLI {
 fn update_cache() -> Result<(), WorkflowError> {
     let mut cache = Cache::new()?;
     let browser = firefox::Browser::new()?;
+    browser.create_places_replica(&cache)?;
     browser.cache_bookmarks(&mut cache)?;
+    browser.cache_history(&mut cache)?;
     Ok(())
 }
 
