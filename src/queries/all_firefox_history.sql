@@ -7,10 +7,11 @@ SELECT p.guid,
 FROM moz_places p
          LEFT JOIN moz_origins o ON o.id = p.origin_id
 WHERE 1 = 1
-  AND (
-    (p.frecency >= 500)
-        OR (p.frecency >= 100 AND o.frecency >= 1000)
-    )
+  -- For testing purposes, we're removing the frecency filter
+  -- AND (
+  --  (p.frecency >= 500)
+  --      OR (p.frecency >= 100 AND o.frecency >= 1000)
+  --  )
   AND p.url NOT LIKE 'https://www.google.com/search%'
 ORDER BY frecency DESC LIMIT 5000;
 

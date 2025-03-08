@@ -117,13 +117,13 @@ impl Browser {
 
     /// Returns the full path to the places.sqlite database
     ///
-    pub(crate) fn places_path(&self) -> PathBuf {
+    pub fn places_path(&self) -> PathBuf {
         self.profile_dir.join("places.sqlite")
     }
 
     /// Returns the full path to the location of the places.sqlite replica file inside our cache.
     ///
-    pub(crate) fn places_replica_path(&self, cache: &Cache) -> PathBuf {
+    pub fn places_replica_path(&self, cache: &Cache) -> PathBuf {
         cache.data_dir.join("firefox-places.sqlite")
     }
 
@@ -159,6 +159,11 @@ impl Browser {
     /// if the expected Firefox directory for the OS doesn't exist.
     ///
     pub fn default_firefox_profiles_dir() -> Result<PathBuf> {
+        // For testing purposes, check if the TEST_FIREFOX_PROFILE_DIR environment variable is set
+        if let Ok(test_dir) = std::env::var("TEST_FIREFOX_PROFILE_DIR") {
+            return Ok(PathBuf::from(test_dir));
+        }
+
         let home_dir = dirs::home_dir().ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -188,25 +193,174 @@ impl Browser {
 mod tests {
     use super::*;
     use crate::testutils::create_test_cache;
+    use std::env;
+
+    /// Helper function to get the path to our test Firefox profile
+    fn test_firefox_profile_dir() -> PathBuf {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("test_data/firefox_profile/test.default");
+        path
+    }
+
+    /// Helper function to get the path to our test Firefox profiles directory
+    fn test_firefox_profiles_dir() -> PathBuf {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("test_data/firefox_profile");
+        path
+    }
 
     #[test]
     fn test_create_places_replica() {
         let (cache, _tmpdir) = create_test_cache();
-        let browser = Browser::new().expect("Failed to create browser");
+        let browser = Browser::new()
+            .expect("Failed to create browser")
+            .with_profile_dir(test_firefox_profile_dir());
         let res = browser.create_places_replica(&cache);
         assert!(res.is_ok());
+        
+        // Verify the replica file exists
+        assert!(browser.places_replica_path(&cache).exists(), "Replica file should exist");
     }
 
     #[test]
     fn test_find_default_release_dir() {
-        let path = Browser::default_profile_dir().expect("Shouldn't fail");
-        assert!(path.exists(), "Directory should exist")
+        // Set the test environment variable
+        env::set_var("TEST_FIREFOX_PROFILE_DIR", test_firefox_profiles_dir().to_str().unwrap());
+        
+        let path = Browser::default_firefox_profiles_dir().expect("Shouldn't fail");
+        assert_eq!(path, test_firefox_profiles_dir(), "Should use test directory");
+        
+        // Clean up
+        env::remove_var("TEST_FIREFOX_PROFILE_DIR");
     }
 
     #[test]
-    #[ignore = "CI environments don't have a Firefox home directory"]
-    fn test_default_profile_dir() {
+    fn test_default_profile_dir_with_test_data() {
+        // Set the test environment variable
+        env::set_var("TEST_FIREFOX_PROFILE_DIR", test_firefox_profiles_dir().to_str().unwrap());
+        
         let default_dir = Browser::default_profile_dir().unwrap();
-        assert!(default_dir.exists());
+        assert_eq!(default_dir, test_firefox_profile_dir(), "Should use test profile directory");
+        
+        // Clean up
+        env::remove_var("TEST_FIREFOX_PROFILE_DIR");
+    }
+    
+    #[test]
+    fn test_with_profile_dir() {
+        let profile_dir = test_firefox_profile_dir();
+        let browser = Browser::new()
+            .expect("Failed to create browser")
+            .with_profile_dir(profile_dir.clone());
+        
+        assert_eq!(browser.profile_dir, profile_dir, "Profile directory should be set correctly");
+    }
+    
+    #[test]
+    fn test_places_path() {
+        let profile_dir = test_firefox_profile_dir();
+        let browser = Browser::new()
+            .expect("Failed to create browser")
+            .with_profile_dir(profile_dir.clone());
+        
+        let expected_path = profile_dir.join("places.sqlite");
+        assert_eq!(browser.places_path(), expected_path, "Places path should be correct");
+    }
+    
+    #[test]
+    fn test_places_replica_path() {
+        let (cache, _tmpdir) = create_test_cache();
+        let browser = Browser::new().expect("Failed to create browser");
+        
+        let expected_path = cache.data_dir.join("firefox-places.sqlite");
+        assert_eq!(browser.places_replica_path(&cache), expected_path, "Replica path should be correct");
+    }
+    
+    #[test]
+    fn test_all_bookmarks() {
+        let (cache, _tmpdir) = create_test_cache();
+        let browser = Browser::new()
+            .expect("Failed to create browser")
+            .with_profile_dir(test_firefox_profile_dir());
+        
+        // Create a replica of the places database in the cache
+        browser.create_places_replica(&cache).expect("Failed to create places replica");
+        
+        // Get all bookmarks
+        let bookmarks = browser.all_bookmarks(&cache).expect("Failed to get all bookmarks");
+        
+        // We should have 3 bookmarks in our test data
+        assert_eq!(bookmarks.len(), 3, "Should have 3 bookmarks");
+        
+        // Check that we have the expected bookmarks
+        let titles: Vec<String> = bookmarks.iter().map(|b| b.title.clone()).collect();
+        assert!(titles.contains(&"Mozilla".to_string()), "Should have Mozilla bookmark");
+        assert!(titles.contains(&"Rust Programming Language".to_string()), "Should have Rust bookmark");
+        assert!(titles.contains(&"GitHub".to_string()), "Should have GitHub bookmark");
+    }
+    
+    #[test]
+    fn test_all_history() {
+        let (cache, _tmpdir) = create_test_cache();
+        let browser = Browser::new()
+            .expect("Failed to create browser")
+            .with_profile_dir(test_firefox_profile_dir());
+        
+        // Create a replica of the places database in the cache
+        browser.create_places_replica(&cache).expect("Failed to create places replica");
+        
+        // Get all history
+        let history = browser.all_history(&cache).expect("Failed to get all history");
+        
+        // Our test data should have some history entries
+        assert!(!history.is_empty(), "Should have history entries");
+        
+        // Check that we have the expected history entries
+        let titles: Vec<&str> = history.iter().map(|h| h.title.as_str()).collect();
+        assert!(titles.contains(&"Example Domain") || titles.contains(&"Wikipedia"), 
+               "Should have at least one of the expected history entries");
+    }
+    
+    #[test]
+    fn test_cache_bookmarks() {
+        let (mut cache, _tmpdir) = create_test_cache();
+        let browser = Browser::new()
+            .expect("Failed to create browser")
+            .with_profile_dir(test_firefox_profile_dir());
+        
+        // Create a replica of the places database in the cache
+        browser.create_places_replica(&cache).expect("Failed to create places replica");
+        
+        // Cache the bookmarks
+        browser.cache_bookmarks(&mut cache).expect("Failed to cache bookmarks");
+        
+        // Search for a known bookmark
+        let results = cache.search("Mozilla").expect("Search failed");
+        assert!(!results.is_empty(), "Should find Mozilla bookmark");
+        
+        // Search for another known bookmark
+        let results = cache.search("Rust").expect("Search failed");
+        assert!(!results.is_empty(), "Should find Rust bookmark");
+    }
+    
+    #[test]
+    fn test_cache_history() {
+        let (mut cache, _tmpdir) = create_test_cache();
+        let browser = Browser::new()
+            .expect("Failed to create browser")
+            .with_profile_dir(test_firefox_profile_dir());
+        
+        // Create a replica of the places database in the cache
+        browser.create_places_replica(&cache).expect("Failed to create places replica");
+        
+        // Cache the history
+        browser.cache_history(&mut cache).expect("Failed to cache history");
+        
+        // Search for known history entries
+        let results = cache.search("Example").expect("Search failed");
+        assert!(!results.is_empty(), "Should find Example Domain history entry");
+        
+        let results = cache.search("Wikipedia").expect("Search failed");
+        assert!(!results.is_empty(), "Should find Wikipedia history entry");
     }
 }
