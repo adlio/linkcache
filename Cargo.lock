@@ -32,8 +32,6 @@ dependencies = [
 [[package]]
 name = "alfrusco"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc359c341b335349e72bfc9d830a958234f1bc4d58ec6b0056eb4575be770700"
 dependencies = [
  "arboard",
  "async-trait",
