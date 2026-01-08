@@ -1,4 +1,4 @@
-use alfrusco::{config, Item, Runnable, URLItem, Workflow};
+use alfrusco::{config, Item, Runnable, URLItem, Workflow, ICON_BOOKMARK, ICON_CLOCK};
 use clap::Parser;
 use linkcache::{firefox, Cache};
 use log::{error, info};
@@ -63,9 +63,27 @@ impl Runnable for LinkCacheCLI {
             .into_iter()
             .map(|link| {
                 let mut item: Item = URLItem::new(&link.title, &link.url).into();
-                let subtitle = link.subtitle.unwrap_or_default();
+
+                // Strip protocol from URL
+                let url = link
+                    .url
+                    .strip_prefix("https://")
+                    .or_else(|| link.url.strip_prefix("http://"))
+                    .unwrap_or(&link.url);
+
+                // Build subtitle based on source type
+                let (subtitle, icon, boost) = if link.is_bookmark() {
+                    let folder = link.subtitle.as_deref().unwrap_or_default();
+                    let subtitle = format_bookmark_subtitle(folder, url);
+                    (subtitle, ICON_BOOKMARK, 100)
+                } else {
+                    (url.to_string(), ICON_CLOCK, 0)
+                };
+
                 item = item.subtitle(&subtitle);
                 item = item.matches(format!("{} / {}", subtitle, &link.title));
+                item = item.icon_from_image(icon).boost(boost);
+
                 item
             })
             .collect();
@@ -86,6 +104,60 @@ fn update_cache() -> Result<(), WorkflowError> {
     browser.cache_bookmarks(&mut cache)?;
     browser.cache_history(&mut cache)?;
     Ok(())
+}
+
+/// Format a bookmark subtitle with folder path and URL.
+/// Uses fish-style shortening for long folder paths.
+fn format_bookmark_subtitle(folder: &str, url: &str) -> String {
+    const MAX_LEN: usize = 80;
+    const SEPARATOR: &str = " · ";
+
+    if folder.is_empty() {
+        return url.to_string();
+    }
+
+    let full = format!("{}{}{}", folder, SEPARATOR, url);
+    if full.len() <= MAX_LEN {
+        return full;
+    }
+
+    // Try fish-style shortening: "Work / Areas / Alfred" -> "W / A / Alfred"
+    let shortened_folder = shorten_folder_path_fish_style(folder);
+    let shortened = format!("{}{}{}", shortened_folder, SEPARATOR, url);
+
+    if shortened.len() <= MAX_LEN {
+        shortened
+    } else {
+        // Still too long, truncate URL
+        let available = MAX_LEN.saturating_sub(shortened_folder.len() + SEPARATOR.len() + 1);
+        if available > 10 {
+            format!("{}{}{}…", shortened_folder, SEPARATOR, &url[..available])
+        } else {
+            // Just show URL truncated
+            format!("{}…", &url[..MAX_LEN.saturating_sub(1).min(url.len())])
+        }
+    }
+}
+
+/// Shorten folder path fish-style: "Work / Areas / Alfred" -> "W / A / Alfred"
+/// Keeps the last segment full, abbreviates earlier segments to first char.
+fn shorten_folder_path_fish_style(path: &str) -> String {
+    let parts: Vec<&str> = path.split(" / ").collect();
+    if parts.len() <= 1 {
+        return path.to_string();
+    }
+
+    let mut result = Vec::with_capacity(parts.len());
+    for (i, part) in parts.iter().enumerate() {
+        if i == parts.len() - 1 {
+            // Keep last segment full
+            result.push(part.to_string());
+        } else {
+            // Abbreviate to first character
+            result.push(part.chars().next().map(|c| c.to_string()).unwrap_or_default());
+        }
+    }
+    result.join(" / ")
 }
 
 /// TODO This could be made more generic with improvements to

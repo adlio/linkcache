@@ -63,7 +63,9 @@ impl Browser {
                         let url: String = row.get(1)?;
                         let title: String = row.get(2)?;
                         let subtitle: String = row.get(3)?;
-                        let link = Link::new(guid, url, title).with_subtitle(subtitle);
+                        let link = Link::new(guid, url, title)
+                            .with_subtitle(subtitle)
+                            .with_source("firefox-bookmark");
                         Ok(Some(link))
                     })?
                     .filter_map(|link| link.ok().flatten())
@@ -88,7 +90,7 @@ impl Browser {
                         let guid: String = row.get(0)?;
                         let url: String = row.get(1)?;
                         let title: String = row.get(2)?;
-                        let link = Link::new(guid, url, title);
+                        let link = Link::new(guid, url, title).with_source("firefox-history");
                         Ok(Some(link))
                     })?
                     .filter_map(|link| link.ok().flatten())

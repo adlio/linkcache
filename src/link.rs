@@ -61,6 +61,15 @@ impl Link {
         self.timestamp = timestamp.expect("Failed to create timestamp");
         self
     }
+
+    pub fn with_source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    pub fn is_bookmark(&self) -> bool {
+        self.source.as_deref() == Some("firefox-bookmark")
+    }
 }
 
 #[cfg(test)]

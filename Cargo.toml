@@ -31,6 +31,6 @@ sublime_fuzzy = "0"
 tempfile = "3.10.1"
 
 # Binary-only dependencies
-alfrusco = { version = "0", path = "../alfrusco" }
+alfrusco = "0.3"
 clap = "4.5"
 env_logger = "0.11"

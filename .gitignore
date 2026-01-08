@@ -21,3 +21,6 @@ target/
 # Code Coverage reports
 tarpaulin-report.html
 *.profraw
+
+# AI Agents
+.claude/settings.local.json
