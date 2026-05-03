@@ -141,9 +141,9 @@ impl SidebarState {
                     if !title.is_empty() {
                         titles.insert(0, title);
                     }
-                    match folder.parent_id().clone() {
+                    match folder.parent_id() {
                         Some(pid) => {
-                            current_id = pid.clone();
+                            current_id = pid;
                         }
                         None => {
                             break;
@@ -187,7 +187,7 @@ impl SidebarState {
                             self.item_map
                                 .insert(bookmark.id.clone(), Node::Bookmark(bookmark.clone()));
                         }
-                        _ => {}
+                        SidebarItemType::Value(_) => {}
                     }
                 }
             }
@@ -214,8 +214,8 @@ impl SidebarState {
 
 impl Bookmark {
     /// Returns the title of the bookmark, preferring the human-set title
-    /// and falling back to the title saved from the page. Will return an
-    /// empty
+    /// and falling back to the title saved from the page. Returns None if
+    /// neither the human-set title nor the saved title is available.
     pub fn title(&self) -> Option<String> {
         match self.title {
             Some(ref title) => {
