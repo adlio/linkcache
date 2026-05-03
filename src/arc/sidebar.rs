@@ -173,10 +173,8 @@ impl SidebarState {
             if let SidebarContainer::SpacesAndItems(spaces_and_items) = container {
                 for space in &spaces_and_items.spaces {
                     if let SpaceType::Space(sidebar_space) = space {
-                        self.item_map.insert(
-                            sidebar_space.id.clone(),
-                            Node::Space(sidebar_space.clone()),
-                        );
+                        self.item_map
+                            .insert(sidebar_space.id.clone(), Node::Space(sidebar_space.clone()));
                     }
                 }
                 for item in &spaces_and_items.items {
