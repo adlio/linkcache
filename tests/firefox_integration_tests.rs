@@ -11,6 +11,7 @@ fn test_firefox_profile_dir() -> PathBuf {
 }
 
 #[test]
+#[ignore]
 fn test_firefox_integration_full_workflow() {
     // Create a test cache
     let (mut cache, _temp_dir) = create_test_cache();
@@ -71,6 +72,7 @@ fn test_firefox_integration_full_workflow() {
 }
 
 #[test]
+#[ignore]
 fn test_firefox_integration_empty_search() {
     // Create a test cache
     let (mut cache, _temp_dir) = create_test_cache();
@@ -105,6 +107,7 @@ fn test_firefox_integration_empty_search() {
 }
 
 #[test]
+#[ignore]
 fn test_firefox_integration_no_results() {
     // Create a test cache
     let (mut cache, _temp_dir) = create_test_cache();

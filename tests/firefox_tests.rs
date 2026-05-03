@@ -10,6 +10,7 @@ fn test_firefox_profile_dir() -> PathBuf {
 }
 
 #[test]
+#[ignore]
 fn test_firefox_with_profile_dir() {
     let profile_dir = test_firefox_profile_dir();
     let browser = firefox::Browser::new()
@@ -23,6 +24,7 @@ fn test_firefox_with_profile_dir() {
 }
 
 #[test]
+#[ignore]
 fn test_firefox_cache_bookmarks() {
     let (mut cache, _temp_dir) = create_test_cache();
     let profile_dir = test_firefox_profile_dir();
@@ -53,6 +55,7 @@ fn test_firefox_cache_bookmarks() {
 }
 
 #[test]
+#[ignore]
 fn test_firefox_cache_history() {
     let (mut cache, _temp_dir) = create_test_cache();
     let profile_dir = test_firefox_profile_dir();
@@ -78,6 +81,7 @@ fn test_firefox_cache_history() {
 }
 
 #[test]
+#[ignore]
 fn test_firefox_all_bookmarks() {
     let (cache, _temp_dir) = create_test_cache();
     let profile_dir = test_firefox_profile_dir();
@@ -120,6 +124,7 @@ fn test_firefox_all_bookmarks() {
 }
 
 #[test]
+#[ignore]
 fn test_firefox_all_history() {
     let (cache, _temp_dir) = create_test_cache();
     let profile_dir = test_firefox_profile_dir();

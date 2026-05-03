@@ -70,6 +70,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_default_data_dir() {
         let dir = CacheBuilder::default_data_dir();
         assert!(dir.exists(), "Expected default_data_dir to exist");

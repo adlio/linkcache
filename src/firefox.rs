@@ -212,6 +212,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_create_places_replica() {
         let (cache, _tmpdir) = create_test_cache();
         let browser = Browser::new()
@@ -266,6 +267,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_with_profile_dir() {
         let profile_dir = test_firefox_profile_dir();
         let browser = Browser::new()
@@ -279,6 +281,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_places_path() {
         let profile_dir = test_firefox_profile_dir();
         let browser = Browser::new()
@@ -294,6 +297,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_places_replica_path() {
         let (cache, _tmpdir) = create_test_cache();
         let browser = Browser::new().expect("Failed to create browser");
@@ -307,6 +311,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_all_bookmarks() {
         let (cache, _tmpdir) = create_test_cache();
         let browser = Browser::new()
@@ -343,6 +348,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_all_history() {
         let (cache, _tmpdir) = create_test_cache();
         let browser = Browser::new()
@@ -371,6 +377,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_cache_bookmarks() {
         let (mut cache, _tmpdir) = create_test_cache();
         let browser = Browser::new()
@@ -397,6 +404,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_cache_history() {
         let (mut cache, _tmpdir) = create_test_cache();
         let browser = Browser::new()

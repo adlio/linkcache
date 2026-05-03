@@ -108,14 +108,9 @@ impl Folder {
         if let Some(parent_id) = &self.parent_id {
             Some(parent_id.clone())
         } else {
-            if let Some(parent_id) = self
-                .data
+            self.data
                 .pointer("/itemContainer/containerType/spaceItems/_0")
-            {
-                Some(parent_id.as_str().unwrap().to_string())
-            } else {
-                None
-            }
+                .map(|parent_id| parent_id.as_str().unwrap().to_string())
         }
     }
 }
@@ -175,34 +170,28 @@ impl SidebarState {
             return Ok(());
         }
         for container in &self.sidebar.containers {
-            match container {
-                SidebarContainer::SpacesAndItems(spaces_and_items) => {
-                    for space in &spaces_and_items.spaces {
-                        match space {
-                            SpaceType::Space(sidebar_space) => {
-                                self.item_map.insert(
-                                    sidebar_space.id.clone(),
-                                    Node::Space(sidebar_space.clone()),
-                                );
-                            }
-                            SpaceType::Value(_) => {}
-                        }
-                    }
-                    for item in &spaces_and_items.items {
-                        match item {
-                            SidebarItemType::Folder(folder) => {
-                                self.item_map
-                                    .insert(folder.id.clone(), Node::Folder(folder.clone()));
-                            }
-                            SidebarItemType::Bookmark(bookmark) => {
-                                self.item_map
-                                    .insert(bookmark.id.clone(), Node::Bookmark(bookmark.clone()));
-                            }
-                            _ => {}
-                        }
+            if let SidebarContainer::SpacesAndItems(spaces_and_items) = container {
+                for space in &spaces_and_items.spaces {
+                    if let SpaceType::Space(sidebar_space) = space {
+                        self.item_map.insert(
+                            sidebar_space.id.clone(),
+                            Node::Space(sidebar_space.clone()),
+                        );
                     }
                 }
-                _ => {}
+                for item in &spaces_and_items.items {
+                    match item {
+                        SidebarItemType::Folder(folder) => {
+                            self.item_map
+                                .insert(folder.id.clone(), Node::Folder(folder.clone()));
+                        }
+                        SidebarItemType::Bookmark(bookmark) => {
+                            self.item_map
+                                .insert(bookmark.id.clone(), Node::Bookmark(bookmark.clone()));
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
         Ok(())
@@ -213,18 +202,12 @@ impl SidebarState {
         let mut bookmarks: Vec<Bookmark> = vec![];
 
         for container in &self.sidebar.containers {
-            match container {
-                SidebarContainer::SpacesAndItems(spaces_and_items) => {
-                    for item in &spaces_and_items.items {
-                        match item {
-                            SidebarItemType::Bookmark(bookmark) => {
-                                bookmarks.push(bookmark.clone());
-                            }
-                            _ => {}
-                        }
+            if let SidebarContainer::SpacesAndItems(spaces_and_items) = container {
+                for item in &spaces_and_items.items {
+                    if let SidebarItemType::Bookmark(bookmark) = item {
+                        bookmarks.push(bookmark.clone());
                     }
                 }
-                _ => {}
             }
         }
         bookmarks
