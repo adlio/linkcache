@@ -142,7 +142,7 @@ mod tests {
         // Add with explicit timestamp to ensure consistent ordering
         let now = chrono::Utc::now();
         let one_hour_ago = now - chrono::Duration::hours(1);
-        
+
         cache.add(Link {
             guid: "test-guid-1".to_string(),
             title: "Visual Studio Code".to_string(),
@@ -197,17 +197,20 @@ mod tests {
     fn test_search_fuzzy() -> Result<()> {
         let (mut cache, _temp_dir) = testutils::create_test_cache();
         add_link_fixtures(&mut cache)?;
-        
+
         // Add a link that will definitely match our fuzzy search
         cache.add(Link {
             title: "Visual Studio Code Editor".to_string(),
             url: "https://code.visualstudio.com/editor".to_string(),
             ..Default::default()
         })?;
-        
+
         let results = cache.search("Vis studio")?;
         assert!(!results.is_empty(), "Should find results with fuzzy search");
-        assert!(results[0].title.contains("Visual Studio"), "First result should contain 'Visual Studio'");
+        assert!(
+            results[0].title.contains("Visual Studio"),
+            "First result should contain 'Visual Studio'"
+        );
         Ok(())
     }
 }

@@ -18,7 +18,10 @@ fn test_indexing_chrome_bookmarks() -> Result<()> {
     })?;
     let results = &cache.search("Visual").expect("Search failed");
     assert!(!results.is_empty(), "Should find Visual Studio Code");
-    assert!(results[0].title.contains("Visual"), "Result should contain 'Visual'");
+    assert!(
+        results[0].title.contains("Visual"),
+        "Result should contain 'Visual'"
+    );
 
     // Skip the Chrome browser part since we're focusing on Firefox tests
     // and don't have mock Chrome data

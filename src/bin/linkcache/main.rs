@@ -154,7 +154,12 @@ fn shorten_folder_path_fish_style(path: &str) -> String {
             result.push(part.to_string());
         } else {
             // Abbreviate to first character
-            result.push(part.chars().next().map(|c| c.to_string()).unwrap_or_default());
+            result.push(
+                part.chars()
+                    .next()
+                    .map(|c| c.to_string())
+                    .unwrap_or_default(),
+            );
         }
     }
     result.join(" / ")
