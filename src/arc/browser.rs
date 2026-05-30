@@ -71,15 +71,15 @@ impl Browser {
     /// user's operating system and detected home directory.
     pub fn default_profile_dir() -> PathBuf {
         let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
-        let arc_data_dir = match std::env::consts::OS {
+
+        match std::env::consts::OS {
             "macos" => home_dir.join("Library/Application Support/Arc"),
             // TODO linux is untested
             "linux" => home_dir.join(".config/arc"),
             // TODO windows is untested
             "windows" => home_dir.join("AppData/Local/Arc"),
             _ => home_dir.join(".config/arc"),
-        };
-        arc_data_dir
+        }
     }
 }
 
