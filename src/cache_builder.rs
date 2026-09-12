@@ -72,6 +72,13 @@ mod tests {
     #[test]
     fn test_default_data_dir() {
         let dir = CacheBuilder::default_data_dir();
-        assert!(dir.exists(), "Expected default_data_dir to exist");
+        // `default_data_dir` returns the `.linkcache` folder under the user's
+        // home directory (falling back to /tmp). It does not create the
+        // directory, so we assert on the shape of the returned path rather
+        // than its on-disk existence to keep the test environment-independent.
+        assert!(
+            dir.ends_with(".linkcache"),
+            "Expected default data dir to end with .linkcache, got {dir:?}"
+        );
     }
 }
