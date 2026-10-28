@@ -167,11 +167,7 @@ impl Browser {
 
                 if let Some(children) = node.get("children").and_then(Value::as_array) {
                     for child in children {
-                        traverse(
-                            child,
-                            links,
-                            format!("{}/{}", &subtitle, &my_title).as_str(),
-                        );
+                        traverse(child, links, format!("{}/{}", subtitle, my_title).as_str());
                     }
                 }
             }
