@@ -81,7 +81,7 @@ impl Runnable for LinkCacheCLI {
                 };
 
                 item = item.subtitle(&subtitle);
-                item = item.matches(format!("{} / {}", subtitle, &link.title));
+                item = item.matches(format!("{} / {}", subtitle, link.title));
                 item = item.icon_from_image(icon).boost(boost);
 
                 item
